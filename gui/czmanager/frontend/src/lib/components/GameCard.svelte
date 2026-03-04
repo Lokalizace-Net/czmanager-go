@@ -1,13 +1,22 @@
 <script lang="ts">
   import type { Localization } from '../stores/games.svelte'
 
-  export let game: Localization
-  export let focused = false
-  export let onclick: (() => void) | undefined = undefined
-  export let element: HTMLButtonElement | undefined = undefined
+  let {
+    game,
+    focused = false,
+    onclick,
+    onfocus,
+    element = $bindable()
+  }: {
+    game: Localization
+    focused?: boolean
+    onclick?: () => void
+    onfocus?: () => void
+    element?: HTMLButtonElement
+  } = $props()
 
-  let imageError = false
-  let imageLoaded = false
+  let imageError = $state(false)
+  let imageLoaded = $state(false)
 
   function getStatusLabel(status: string): string {
     switch (status) {
@@ -29,14 +38,15 @@
     }
   }
 
-  $: progress = game.translatePercent || 0
+  let progress = $derived(game.translatePercent || 0)
 </script>
 
 <button
   bind:this={element}
   class="game-card"
   class:focused
-  on:click={onclick}
+  {onclick}
+  {onfocus}
 >
   <!-- Cover Image -->
   <div class="card-image">
@@ -45,8 +55,8 @@
         src={game.imageUrl}
         alt={game.name}
         class:loaded={imageLoaded}
-        on:error={() => imageError = true}
-        on:load={() => imageLoaded = true}
+        onerror={() => imageError = true}
+        onload={() => imageLoaded = true}
         loading="lazy"
       />
     {:else}
@@ -96,10 +106,12 @@
   }
 
   .game-card:hover,
-  .game-card.focused {
+  .game-card.focused,
+  .game-card:focus {
     border-color: #f97316;
     transform: translateY(-4px);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+    outline: none;
   }
 
   .card-image {

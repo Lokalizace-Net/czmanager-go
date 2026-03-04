@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, WifiOff, Play } from 'lucide-svelte'
   import type { Localization } from '../stores/games.svelte'
   import { agentStore } from '../stores/agent.svelte'
+  import { focusStore } from '../stores/focus.svelte'
   import { BrowseFolder, ScanGames, StartAgent, FetchGameDetail, DownloadLocalization } from '../../../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
 
@@ -360,59 +361,42 @@
   }
 
   let modalElement: HTMLDivElement
-  let focusableElements: HTMLElement[] = []
-  let focusedIndex = $state(0)
 
   function updateFocusables() {
     if (!modalElement) return
-    focusableElements = Array.from(
+    const focusableElements = Array.from(
       modalElement.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')
     ) as HTMLElement[]
-    // Focus první element
-    if (focusableElements.length > 0 && focusedIndex === 0) {
-      focusableElements[0]?.focus()
+
+    focusStore.updateZoneElements('modal', focusableElements)
+
+    // Focus první element pokud je modal aktivní
+    if (focusableElements.length > 0) {
+      focusStore.focusCurrent()
     }
   }
 
   onMount(() => {
+    // Registruj modal jako focus zónu
+    focusStore.registerZone({
+      id: 'modal',
+      elements: [],
+      columns: 1,
+      loop: false,
+      onEscape: () => {
+        onClose?.()
+      }
+    })
+
     scanForGame()
     // Počkáme na renderování a pak nastavíme focusables
     setTimeout(updateFocusables, 100)
-    return () => {
-      stopProgressPolling()
-    }
   })
 
-  function handleKeydown(e: KeyboardEvent) {
-    // Ignoruj pokud je focus v inputu (kromě šipek)
-    const inInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
-
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      if (inInput) return
-      e.preventDefault()
-      focusedIndex = Math.min(focusedIndex + 1, focusableElements.length - 1)
-      focusableElements[focusedIndex]?.focus()
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      if (inInput) return
-      e.preventDefault()
-      focusedIndex = Math.max(focusedIndex - 1, 0)
-      focusableElements[focusedIndex]?.focus()
-    } else if (e.key === 'Enter' && !installing && !uninstalling && !downloading) {
-      if (inInput) return
-      // Pokud je focus na tlačítku, nech ho kliknout
-      if (e.target instanceof HTMLButtonElement) {
-        return // Nechej defaultní chování
-      }
-      // Jinak spusť primární akci
-      if (isReady && supportsAppInstall && gamePath && agentConnected) {
-        e.preventDefault()
-        startInstall()
-      } else if (isReady && !supportsAppInstall) {
-        e.preventDefault()
-        downloadLocalization()
-      }
-    }
-  }
+  onDestroy(() => {
+    stopProgressPolling()
+    focusStore.unregisterZone('modal')
+  })
 
   // Aktualizuj focusables když se změní stav
   $effect(() => {
@@ -421,8 +405,6 @@
     }
   })
 </script>
-
-<svelte:window onkeydown={handleKeydown} />
 
 <div class="modal-card" bind:this={modalElement}>
   <!-- Header -->
@@ -514,10 +496,11 @@
       {/if}
 
       <div class="input-section">
-        <label>Cesta ke hře</label>
+        <label for="game-path-input">Cesta ke hře</label>
         <div class="input-row">
           <div class="input-wrapper">
             <input
+              id="game-path-input"
               type="text"
               bind:value={gamePath}
               placeholder="Vyberte složku s hrou..."
@@ -704,9 +687,12 @@
     transition: all 0.2s;
   }
 
-  .close-btn:hover {
+  .close-btn:hover,
+  .close-btn:focus {
     background: rgba(0, 0, 0, 0.7);
     color: white;
+    outline: none;
+    box-shadow: 0 0 0 2px #f97316;
   }
 
   .header-content {
@@ -888,7 +874,7 @@
   }
 
   .input-wrapper input::placeholder { color: rgba(255, 255, 255, 0.2); }
-  .input-wrapper input:focus { border-color: rgba(249, 115, 22, 0.5); }
+  .input-wrapper input:focus { border-color: #f97316; box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3); }
   .input-wrapper input:disabled { opacity: 0.5; }
 
   .input-wrapper :global(.input-icon) {
@@ -914,7 +900,8 @@
     transition: all 0.2s;
   }
 
-  .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+  .btn-secondary:hover,
+  .btn-secondary:focus { background: rgba(255, 255, 255, 0.1); color: white; outline: none; box-shadow: 0 0 0 2px #f97316; }
   .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-icon {
@@ -931,7 +918,8 @@
     transition: all 0.2s;
   }
 
-  .btn-icon:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+  .btn-icon:hover,
+  .btn-icon:focus { background: rgba(255, 255, 255, 0.1); color: white; outline: none; box-shadow: 0 0 0 2px #f97316; }
   .btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
 
   :global(.spinning) { animation: spin 1s linear infinite; }
@@ -1016,7 +1004,8 @@
     transition: all 0.2s;
   }
 
-  .btn-primary:hover { background: #ea580c; }
+  .btn-primary:hover,
+  .btn-primary:focus { background: #ea580c; outline: none; box-shadow: 0 0 0 2px #fff; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn-danger {
@@ -1036,7 +1025,8 @@
     transition: all 0.2s;
   }
 
-  .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+  .btn-danger:hover,
+  .btn-danger:focus { background: rgba(239, 68, 68, 0.2); outline: none; box-shadow: 0 0 0 2px #f97316; }
   .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn-cancel {
@@ -1051,7 +1041,8 @@
     transition: all 0.2s;
   }
 
-  .btn-cancel:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+  .btn-cancel:hover,
+  .btn-cancel:focus { background: rgba(255, 255, 255, 0.1); color: white; outline: none; box-shadow: 0 0 0 2px #f97316; }
 
   .status-message {
     display: flex;
@@ -1116,10 +1107,13 @@
     transition: all 0.2s;
   }
 
-  .btn-secondary-large:hover {
+  .btn-secondary-large:hover,
+  .btn-secondary-large:focus {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.25);
     color: white;
+    outline: none;
+    box-shadow: 0 0 0 2px #f97316;
   }
 
   .agent-warning {
@@ -1166,9 +1160,12 @@
     transition: all 0.2s;
   }
 
-  .btn-start-agent:hover:not(:disabled) {
+  .btn-start-agent:hover:not(:disabled),
+  .btn-start-agent:focus:not(:disabled) {
     background: rgba(34, 197, 94, 0.25);
     border-color: rgba(34, 197, 94, 0.4);
+    outline: none;
+    box-shadow: 0 0 0 2px #f97316;
   }
 
   .btn-start-agent:disabled { opacity: 0.6; cursor: not-allowed; }
