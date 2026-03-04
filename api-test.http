@@ -1,0 +1,97 @@
+### CZManager Agent API Tests
+### Use with VS Code REST Client extension or similar
+
+@baseUrl = http://127.0.0.1:17892
+@token = ed96618839f2f2a2dad89649b733fce4
+
+### Ping (public endpoint - returns token)
+GET {{baseUrl}}/ping
+
+### Status
+GET {{baseUrl}}/status
+Authorization: Bearer {{token}}
+
+### Scan all games
+POST {{baseUrl}}/scan-games
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Search for specific game
+POST {{baseUrl}}/scan-games
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "game_name": "Hogwarts"
+}
+
+### Search for GTA
+POST {{baseUrl}}/scan-games
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "game_name": "Grand Theft Auto"
+}
+
+### Browse for folder (opens native dialog)
+POST {{baseUrl}}/browse-folder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Vyberte složku s hrou"
+}
+
+### Browse for file (opens native dialog)
+POST {{baseUrl}}/browse-file
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Vyberte soubor",
+  "filter": "*.exe"
+}
+
+### Get progress
+GET {{baseUrl}}/progress
+Authorization: Bearer {{token}}
+
+### Get logs
+GET {{baseUrl}}/logs
+Authorization: Bearer {{token}}
+
+### Get logs since index
+GET {{baseUrl}}/logs?since=10
+Authorization: Bearer {{token}}
+
+### Check for updates
+GET {{baseUrl}}/update-check
+Authorization: Bearer {{token}}
+
+### Install localization (example)
+POST {{baseUrl}}/install
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "game_slug": "hogwarts-legacy",
+  "version": "1.0.0",
+  "download_url": "https://example.com/localization.zip",
+  "game_root": "D:\\Games\\Steam\\steamapps\\common\\Hogwarts Legacy"
+}
+
+### Uninstall localization (example)
+POST {{baseUrl}}/uninstall
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "game_root": "D:\\Games\\Steam\\steamapps\\common\\Hogwarts Legacy"
+}
+
+### Cancel current operation
+POST {{baseUrl}}/cancel
+Authorization: Bearer {{token}}
