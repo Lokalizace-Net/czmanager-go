@@ -167,6 +167,28 @@ func (s *Service) doInstall(req models.InstallRequest) {
 	s.logInfo(fmt.Sprintf("Zahajuji instalaci %s v%s", req.GameSlug, req.Version))
 	s.logInfo(fmt.Sprintf("Cílová složka: %s", req.GameRoot))
 
+	// Zjistíme download URL z API pokud není zadané
+	downloadURL := req.DownloadURL
+	if downloadURL == "" && req.GameID > 0 {
+		s.setProgress(models.StageDownloading, 0, "Získávání informací o lokalizaci...")
+		s.logInfo(fmt.Sprintf("Načítám detail hry z API (ID: %d)...", req.GameID))
+
+		var err error
+		downloadURL, err = s.fetchDownloadURL(req.GameID)
+		if err != nil {
+			s.setError(fmt.Sprintf("Nepodařilo se získat URL ke stažení: %v", err))
+			s.logError(err.Error())
+			return
+		}
+		s.logInfo(fmt.Sprintf("Nalezena URL: %s", downloadURL))
+	}
+
+	if downloadURL == "" {
+		s.setError("Chybí URL ke stažení lokalizace")
+		s.logError("download_url ani game_id nebyly zadány")
+		return
+	}
+
 	// Create temp directory
 	tempDir, err := os.MkdirTemp("", "czmanager-*")
 	if err != nil {
@@ -180,10 +202,10 @@ func (s *Service) doInstall(req models.InstallRequest) {
 	extractPath := filepath.Join(tempDir, "extracted")
 
 	// Download
-	s.setProgress(models.StageDownloading, 0, "Stahování lokalizace...")
-	s.logInfo(fmt.Sprintf("Stahování z: %s", req.DownloadURL))
+	s.setProgress(models.StageDownloading, 5, "Stahování lokalizace...")
+	s.logInfo(fmt.Sprintf("Stahování z: %s", downloadURL))
 
-	if err := s.downloadFile(req.DownloadURL, zipPath); err != nil {
+	if err := s.downloadFile(downloadURL, zipPath); err != nil {
 		s.setError(fmt.Sprintf("Stahování selhalo: %v", err))
 		s.logError(err.Error())
 		return
@@ -403,6 +425,53 @@ func (s *Service) installFile(moddFile models.ModdFile, extractPath, gameRoot st
 	}
 
 	return nil
+}
+
+const apiBaseURL = "https://lokalizace.net/api"
+
+// fetchDownloadURL gets the download URL from API for given game ID
+func (s *Service) fetchDownloadURL(gameID int) (string, error) {
+	// Fetch game detail from API
+	url := fmt.Sprintf("%s/games/%d", apiBaseURL, gameID)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("nepodařilo se spojit s API: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API vrátilo status %d", resp.StatusCode)
+	}
+
+	// Parse response
+	var result struct {
+		Files []struct {
+			ID          int    `json:"id"`
+			Version     string `json:"version"`
+			FileName    string `json:"fileName"`
+			InstallType string `json:"installType"`
+		} `json:"files"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("nepodařilo se zpracovat odpověď API: %v", err)
+	}
+
+	if len(result.Files) == 0 {
+		return "", fmt.Errorf("pro tuto lokalizaci nejsou dostupné žádné soubory ke stažení")
+	}
+
+	// Najdeme nejnovější soubor (poslední v poli nebo podle verze)
+	// API vrací soubory seřazené, takže vezmeme poslední
+	latestFile := result.Files[len(result.Files)-1]
+
+	s.logInfo(fmt.Sprintf("Vybrán soubor: %s (verze %s)", latestFile.FileName, latestFile.Version))
+
+	// Vytvoříme download URL
+	downloadURL := fmt.Sprintf("%s/download/%d", apiBaseURL, latestFile.ID)
+	return downloadURL, nil
 }
 
 func (s *Service) downloadFile(url, destPath string) error {

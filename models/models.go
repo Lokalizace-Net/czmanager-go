@@ -33,8 +33,9 @@ const (
 // InstallRequest is sent by the web app to start installation
 type InstallRequest struct {
 	GameSlug    string `json:"game_slug"`
+	GameID      int    `json:"game_id,omitempty"`      // ID hry z API
 	Version     string `json:"version"`
-	DownloadURL string `json:"download_url"`
+	DownloadURL string `json:"download_url,omitempty"` // Volitelné - agent si zjistí sám
 	GameRoot    string `json:"game_root"`
 }
 

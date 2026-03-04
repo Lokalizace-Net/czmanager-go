@@ -1,0 +1,244 @@
+<script lang="ts">
+  import type { Localization } from '../stores/games.svelte'
+
+  export let game: Localization
+  export let focused = false
+  export let onclick: (() => void) | undefined = undefined
+  export let element: HTMLButtonElement | undefined = undefined
+
+  let imageError = false
+  let imageLoaded = false
+
+  function getStatusLabel(status: string): string {
+    switch (status) {
+      case 'released': return 'Veřejná verze'
+      case 'beta': return 'Beta'
+      case 'translating': return 'Překládá se'
+      case 'wip': return 'Rozpracováno'
+      default: return 'Připravuje se'
+    }
+  }
+
+  function getStatusClass(status: string): string {
+    switch (status) {
+      case 'released': return 'status-released'
+      case 'beta': return 'status-beta'
+      case 'translating': return 'status-translating'
+      case 'wip': return 'status-wip'
+      default: return 'status-draft'
+    }
+  }
+
+  $: progress = game.translatePercent || 0
+</script>
+
+<button
+  bind:this={element}
+  class="game-card"
+  class:focused
+  on:click={onclick}
+>
+  <!-- Cover Image -->
+  <div class="card-image">
+    {#if !imageError && game.imageUrl}
+      <img
+        src={game.imageUrl}
+        alt={game.name}
+        class:loaded={imageLoaded}
+        on:error={() => imageError = true}
+        on:load={() => imageLoaded = true}
+        loading="lazy"
+      />
+    {:else}
+      <div class="placeholder">
+        <span>{game.name.charAt(0)}</span>
+      </div>
+    {/if}
+
+    <!-- Status Badge - top right -->
+    <div class="status-badge {getStatusClass(game.status)}">
+      {getStatusLabel(game.status)}
+    </div>
+  </div>
+
+  <!-- Info section -->
+  <div class="card-info">
+    <h3 class="card-title">{game.name}</h3>
+
+    {#if game.teamName}
+      <p class="card-team">{game.teamName}</p>
+    {/if}
+
+    <!-- Progress section -->
+    <div class="progress-section">
+      <div class="progress-row">
+        <span class="progress-label">Přeloženo</span>
+        <span class="progress-value" class:complete={progress >= 100}>{progress}%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" class:complete={progress >= 100} style="width: {progress}%"></div>
+      </div>
+    </div>
+  </div>
+</button>
+
+<style>
+  .game-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #1a1a1a;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .game-card:hover,
+  .game-card.focused {
+    border-color: #f97316;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-image {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    overflow: hidden;
+  }
+
+  .card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .card-image img.loaded {
+    opacity: 1;
+  }
+
+  .game-card:hover .card-image img {
+    transform: scale(1.05);
+  }
+
+  .placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .placeholder span {
+    font-size: 48px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.1);
+  }
+
+  .status-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: 0.3px;
+  }
+
+  .status-badge.status-released {
+    background: linear-gradient(135deg, #10b981, #059669);
+  }
+
+  .status-badge.status-beta {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  }
+
+  .status-badge.status-translating {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+  }
+
+  .status-badge.status-wip {
+    background: linear-gradient(135deg, #eab308, #ca8a04);
+  }
+
+  .status-badge.status-draft {
+    background: linear-gradient(135deg, #64748b, #475569);
+  }
+
+  .card-info {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+  }
+
+  .card-team {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .progress-section {
+    margin-top: 8px;
+  }
+
+  .progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .progress-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .progress-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .progress-value.complete {
+    color: #10b981;
+  }
+
+  .progress-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #34d399);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-fill.complete {
+    background: linear-gradient(90deg, #10b981, #34d399);
+  }
+</style>
