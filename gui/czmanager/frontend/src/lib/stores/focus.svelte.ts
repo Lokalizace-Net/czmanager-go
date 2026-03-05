@@ -58,7 +58,8 @@ function createFocusStore() {
   // Přepne na jinou zónu
   function setActiveZone(zoneId: string, saveHistory = true) {
     update(s => {
-      const history = saveHistory && s.activeZone !== zoneId
+      // Pouze uložíme historii pokud přecházíme DO modalu
+      const history = saveHistory && zoneId === 'modal' && s.activeZone !== 'modal'
         ? [...s.history, s.activeZone]
         : s.history
       return {
@@ -71,18 +72,24 @@ function createFocusStore() {
     focusCurrent()
   }
 
-  // Vrátí se na předchozí zónu
+  // Vrátí se na předchozí zónu (používá se pro Escape/B)
   function goBack() {
     const state = get({ subscribe })
     const zone = state.zones.get(state.activeZone)
 
-    // Zkus escape handler zóny
-    if (zone?.onEscape) {
+    // Pokud jsme v modalu, zavři ho
+    if (state.activeZone === 'modal' && zone?.onEscape) {
       zone.onEscape()
       return true
     }
 
-    // Nebo se vrať v historii
+    // Z menu nebo gridu se vrať na hlavní grid
+    if (state.activeZone === 'sidemenu') {
+      setActiveZone('main', false)
+      return true
+    }
+
+    // Nebo se vrať v historii (pro modal)
     if (state.history.length > 0) {
       const prevZone = state.history[state.history.length - 1]
       update(s => ({
@@ -110,11 +117,14 @@ function createFocusStore() {
     focusCurrent()
   }
 
-  // Pohyb focusu
+  // Pohyb focusu v aktuální zóně
   function moveFocus(direction: 'up' | 'down' | 'left' | 'right'): boolean {
     const state = get({ subscribe })
     const zone = state.zones.get(state.activeZone)
-    if (!zone || zone.elements.length === 0) return false
+
+    if (!zone || zone.elements.length === 0) {
+      return false
+    }
 
     const cols = zone.columns || 1
     const current = state.focusedIndex
@@ -134,25 +144,6 @@ function createFocusStore() {
       case 'right':
         next = current + 1
         break
-    }
-
-    // Kontrola hranic pro přechod mezi zónami
-    if (!zone.loop) {
-      // Šipka doleva z levého okraje main gridu -> sidemenu
-      if (direction === 'left' && state.activeZone === 'main' && current % cols === 0) {
-        setActiveZone('sidemenu')
-        return true
-      }
-      // Šipka doprava ze sidemenu -> main
-      if (direction === 'right' && state.activeZone === 'sidemenu') {
-        setActiveZone('main')
-        return true
-      }
-      // Šipka nahoru z horního řádku main gridu - signalizuj že jsme na hranici
-      if (direction === 'up' && state.activeZone === 'main' && current < cols) {
-        // Vrať false aby App.svelte mohl přepnout na search
-        return false
-      }
     }
 
     // Zacyklení nebo omezení
@@ -184,60 +175,68 @@ function createFocusStore() {
     setTimeout(() => {
       const state = get({ subscribe })
       const zone = state.zones.get(state.activeZone)
-      if (!zone) return
+      if (!zone || zone.elements.length === 0) {
+        return
+      }
 
-      const element = zone.elements[state.focusedIndex]
+      const index = Math.min(state.focusedIndex, zone.elements.length - 1)
+      const element = zone.elements[index]
       if (element) {
         element.focus()
-        // Scroll do view pokud je potřeba
         element.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
       }
-    }, 10)
+    }, 20)
   }
 
   // Globální keyboard handler
   function handleKeydown(event: KeyboardEvent) {
-    // Ignoruj pokud je focus v inputu (kromě navigačních kláves)
+    // Ignoruj pokud je focus v inputu
     const inInput = event.target instanceof HTMLInputElement ||
                     event.target instanceof HTMLTextAreaElement
+    if (inInput) return
+
+    const state = get({ subscribe })
+    const currentZone = state.activeZone
+    const zone = state.zones.get(currentZone)
 
     switch (event.key) {
       case 'ArrowUp':
-        if (inInput) return
         event.preventDefault()
         moveFocus('up')
         break
       case 'ArrowDown':
-        if (inInput) return
         event.preventDefault()
         moveFocus('down')
         break
       case 'ArrowLeft':
-        if (inInput) return
         event.preventDefault()
+        // Z levého okraje main gridu -> sidemenu
+        if (currentZone === 'main' && zone) {
+          const cols = zone.columns || 1
+          if (state.focusedIndex % cols === 0) {
+            setActiveZone('sidemenu', false)
+            return
+          }
+        }
         moveFocus('left')
         break
       case 'ArrowRight':
-        if (inInput) return
         event.preventDefault()
+        // Ze sidemenu -> main
+        if (currentZone === 'sidemenu') {
+          setActiveZone('main', false)
+          return
+        }
         moveFocus('right')
         break
       case 'Enter':
       case ' ':
-        if (inInput && event.key === ' ') return
         // Nechej nativní click na button
         if (event.target instanceof HTMLButtonElement) return
         event.preventDefault()
         selectCurrent()
         break
       case 'Escape':
-      case 'Backspace':
-        if (inInput) {
-          if (event.key === 'Escape') {
-            (event.target as HTMLElement).blur()
-          }
-          return
-        }
         event.preventDefault()
         goBack()
         break

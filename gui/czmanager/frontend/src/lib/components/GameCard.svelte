@@ -5,14 +5,12 @@
     game,
     focused = false,
     onclick,
-    onfocus,
-    element = $bindable()
+    onfocus
   }: {
     game: Localization
     focused?: boolean
     onclick?: () => void
     onfocus?: () => void
-    element?: HTMLButtonElement
   } = $props()
 
   let imageError = $state(false)
@@ -42,7 +40,6 @@
 </script>
 
 <button
-  bind:this={element}
   class="game-card"
   class:focused
   {onclick}

@@ -21,9 +21,6 @@
   let searchInput = $state<HTMLInputElement | undefined>(undefined)
 
   onMount(async () => {
-    // Setup keyboard handler
-    window.addEventListener('keydown', focusStore.handleKeydown)
-
     // Start gamepad polling
     startGamepadPolling()
 
@@ -50,7 +47,6 @@
 
   onDestroy(() => {
     agentStore.stopHealthCheck()
-    window.removeEventListener('keydown', focusStore.handleKeydown)
     stopGamepadPolling()
   })
 
@@ -85,50 +81,65 @@
     }
   }
 
-  // Zkratka / pro vyhledávání, Tab pro přepínání zón
+  // Hlavní keyboard handler pro navigaci
   function handleGlobalKeydown(e: KeyboardEvent) {
-    if (e.key === '/' && !(e.target instanceof HTMLInputElement)) {
+    const inSearch = e.target === searchInput
+    const inInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
+
+    // Zkratka / pro vyhledávání
+    if (e.key === '/' && !inInput) {
       e.preventDefault()
       searchInput?.focus()
+      return
     }
-    // Tab přepíná mezi zónami: main -> sidemenu -> search -> main
-    if (e.key === 'Tab' && !(e.target instanceof HTMLInputElement)) {
-      e.preventDefault()
-      const currentZone = $focusStore.activeZone
-      if (currentZone === 'main') {
-        focusStore.setActiveZone('sidemenu')
-      } else if (currentZone === 'sidemenu') {
+
+    // SEARCH INPUT navigace
+    if (inSearch) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        searchInput?.blur()
+        focusStore.setActiveZone('sidemenu', false)
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        searchInput?.blur()
+        focusStore.setActiveZone('main', false)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        searchInput?.blur()
+        focusStore.setActiveZone('main', false)
+      }
+      return
+    }
+
+    // Ignoruj ostatní inputy
+    if (inInput) return
+
+    const currentZone = $focusStore.activeZone
+    const state = $focusStore
+    const zone = state.zones.get('main')
+
+    // Speciální případy pro přechod na search z hlavního gridu
+    if (e.key === 'ArrowUp' && currentZone === 'main' && zone) {
+      const cols = zone.columns || 4
+      if (state.focusedIndex < cols) {
+        e.preventDefault()
         searchInput?.focus()
+        return
       }
     }
-    // Šipka nahoru ze search inputu přepne na sidemenu
-    if (e.key === 'ArrowUp' && e.target === searchInput) {
-      e.preventDefault()
-      searchInput?.blur()
-      focusStore.setActiveZone('sidemenu')
-    }
-    // Šipka dolů ze search inputu přepne na main grid
-    if (e.key === 'ArrowDown' && e.target === searchInput) {
-      e.preventDefault()
-      searchInput?.blur()
-      focusStore.setActiveZone('main')
-    }
-    // Šipka nahoru z horního řádku main gridu -> search
-    if (e.key === 'ArrowUp' && !(e.target instanceof HTMLInputElement)) {
-      const currentZone = $focusStore.activeZone
-      const state = $focusStore
-      const zone = state.zones.get('main')
-      if (currentZone === 'main' && zone) {
-        const cols = zone.columns || 4
-        const currentIndex = state.focusedIndex
-        // Pokud jsme na horním řádku
-        if (currentIndex < cols) {
-          e.preventDefault()
-          e.stopPropagation()
-          searchInput?.focus()
-        }
+
+    // Escape nebo šipka doleva z main (i prázdného) -> sidemenu
+    if ((e.key === 'Escape' || e.key === 'ArrowLeft') && currentZone === 'main') {
+      // Pokud nejsme na home stránce nebo nemáme zónu, jdi rovnou na menu
+      if (!zone || zone.elements.length === 0 || activeMenuItem !== 'home') {
+        e.preventDefault()
+        focusStore.setActiveZone('sidemenu', false)
+        return
       }
     }
+
+    // Vše ostatní deleguj na focusStore
+    focusStore.handleKeydown(e)
   }
 </script>
 

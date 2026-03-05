@@ -8,9 +8,8 @@
 
   let { onGameSelect }: { onGameSelect?: (game: Localization) => void } = $props()
 
-  let gridElement = $state<HTMLElement | undefined>(undefined)
-  let cardElements = $state<HTMLButtonElement[]>([])
-  let scrollContainer = $state<HTMLElement | null>(null)
+  let gridElement: HTMLElement
+  let scrollContainer: HTMLElement | null = null
   let gridColumns = $state(4)
 
   function updateGridColumns() {
@@ -21,15 +20,23 @@
     gridColumns = Math.floor((width + gap) / (cardMinWidth + gap))
     gridColumns = Math.max(2, Math.min(8, gridColumns))
 
-    // Aktualizuj zónu s novým počtem sloupců
+    // Aktualizuj zónu s novým počtem sloupců a elementy
+    updateGridElements()
+  }
+
+  function updateGridElements() {
+    if (!gridElement) return
+    const buttons = Array.from(gridElement.querySelectorAll('.game-card')) as HTMLButtonElement[]
     const state = get(focusStore)
     const zone = state.zones.get('main')
-    if (zone) {
-      focusStore.registerZone({
-        ...zone,
-        columns: gridColumns
-      })
-    }
+
+    focusStore.registerZone({
+      id: 'main',
+      elements: buttons,
+      columns: gridColumns,
+      loop: false,
+      onEscape: zone?.onEscape
+    })
   }
 
   function handleScroll() {
@@ -50,7 +57,7 @@
       columns: gridColumns,
       loop: false,
       onEscape: () => {
-        focusStore.setActiveZone('sidemenu')
+        focusStore.setActiveZone('sidemenu', false)
       }
     })
 
@@ -62,6 +69,9 @@
     if (scrollContainer) {
       scrollContainer.addEventListener('scroll', handleScroll)
     }
+
+    // Aktualizuj elementy po renderování
+    setTimeout(updateGridElements, 100)
   })
 
   onDestroy(() => {
@@ -72,13 +82,12 @@
     focusStore.unregisterZone('main')
   })
 
-  // Aktualizuj elementy v zóně když se změní cardElements
+  // Aktualizuj elementy když se změní seznam her
   $effect(() => {
-    if (cardElements.length > 0) {
-      const validElements = cardElements.filter(Boolean)
-      if (validElements.length > 0) {
-        focusStore.updateZoneElements('main', validElements)
-      }
+    const games = $filteredLocalizations
+    if (games.length > 0) {
+      // Počkej na renderování
+      setTimeout(updateGridElements, 50)
     }
   })
 
@@ -112,7 +121,6 @@
 >
   {#each $filteredLocalizations as game, index (game.id)}
     <GameCard
-      bind:element={cardElements[index]}
       {game}
       focused={isMainActive && focusedIndex === index}
       onclick={() => handleCardClick(game, index)}

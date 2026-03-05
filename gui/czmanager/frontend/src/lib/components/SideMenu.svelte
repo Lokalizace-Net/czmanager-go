@@ -28,7 +28,7 @@
     { id: 'help', label: 'Nápověda', icon: HelpCircle },
   ]
 
-  let menuElements = $state<HTMLButtonElement[]>([])
+  let menuButtons: HTMLButtonElement[] = []
 
   onMount(() => {
     // Registruj menu jako focus zónu
@@ -38,15 +38,17 @@
       columns: 1,
       loop: true,
       onEscape: () => {
-        // Při Escape přejdi na hlavní obsah
-        focusStore.setActiveZone('main')
+        focusStore.setActiveZone('main', false)
       }
     })
 
-    // Aktualizuj elementy
+    // Počkej na renderování a pak zaregistruj elementy
     setTimeout(() => {
-      focusStore.updateZoneElements('sidemenu', menuElements.filter(Boolean))
-    }, 50)
+      const validButtons = menuButtons.filter(Boolean)
+      if (validButtons.length > 0) {
+        focusStore.updateZoneElements('sidemenu', validButtons)
+      }
+    }, 200)
   })
 
   onDestroy(() => {
@@ -55,10 +57,8 @@
 
   function handleClick(itemId: string) {
     onNavigate(itemId)
-  }
-
-  function handleFocus() {
-    focusStore.setActiveZone('sidemenu', false)
+    // Po kliknutí přejdi na hlavní obsah
+    focusStore.setActiveZone('main', false)
   }
 
   let agentStatus = $derived($agentStore.status)
@@ -78,11 +78,10 @@
   <nav class="menu-nav">
     {#each menuItems as item, index (item.id)}
       <button
-        bind:this={menuElements[index]}
+        bind:this={menuButtons[index]}
         class="menu-item"
         class:active={activeItem === item.id}
         onclick={() => handleClick(item.id)}
-        onfocus={handleFocus}
       >
         <item.icon size={22} />
         {#if !collapsed}
