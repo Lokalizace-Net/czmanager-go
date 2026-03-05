@@ -11,6 +11,7 @@
   let gridElement: HTMLElement
   let scrollContainer: HTMLElement | null = null
   let gridColumns = $state(4)
+  let hasSupportButton = $state(false)
 
   function updateGridColumns() {
     if (!gridElement) return
@@ -26,13 +27,21 @@
 
   function updateGridElements() {
     if (!gridElement) return
-    const buttons = Array.from(gridElement.querySelectorAll('.game-card')) as HTMLButtonElement[]
+
+    // Najdi support button z WelcomeBanner (je před gridem)
+    const supportBtn = document.querySelector('.support-btn') as HTMLButtonElement | null
+    const gameCards = Array.from(gridElement.querySelectorAll('.game-card')) as HTMLButtonElement[]
+
+    // Support button je na indexu 0, pak následují karty
+    const elements: HTMLButtonElement[] = supportBtn ? [supportBtn, ...gameCards] : gameCards
+    hasSupportButton = !!supportBtn
+
     const state = get(focusStore)
     const zone = state.zones.get('main')
 
     focusStore.registerZone({
       id: 'main',
-      elements: buttons,
+      elements: elements,
       columns: gridColumns,
       loop: false,
       onEscape: zone?.onEscape
@@ -91,14 +100,19 @@
     }
   })
 
+  // Offset pro game cards - support button je na indexu 0
+  function getCardIndex(gameIndex: number): number {
+    return hasSupportButton ? gameIndex + 1 : gameIndex
+  }
+
   function handleCardClick(game: Localization, index: number) {
-    focusStore.setFocusedIndex(index)
+    focusStore.setFocusedIndex(getCardIndex(index))
     onGameSelect?.(game)
   }
 
   function handleCardFocus(index: number) {
     focusStore.setActiveZone('main', false)
-    focusStore.setFocusedIndex(index)
+    focusStore.setFocusedIndex(getCardIndex(index))
   }
 
   let gameCount = $derived($filteredLocalizations.length)
@@ -122,7 +136,7 @@
   {#each $filteredLocalizations as game, index (game.id)}
     <GameCard
       {game}
-      focused={isMainActive && focusedIndex === index}
+      focused={isMainActive && focusedIndex === (hasSupportButton ? index + 1 : index)}
       onclick={() => handleCardClick(game, index)}
       onfocus={() => handleCardFocus(index)}
     />

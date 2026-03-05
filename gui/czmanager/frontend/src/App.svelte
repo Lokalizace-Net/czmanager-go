@@ -118,12 +118,43 @@
     const state = $focusStore
     const zone = state.zones.get('main')
 
-    // Speciální případy pro přechod na search z hlavního gridu
-    if (e.key === 'ArrowUp' && currentZone === 'main' && zone) {
-      const cols = zone.columns || 4
-      if (state.focusedIndex < cols) {
+    // Support button je na indexu 0 - speciální navigace
+    const hasSupportBtn = zone?.elements[0]?.classList.contains('support-btn')
+    const onSupportBtn = hasSupportBtn && state.focusedIndex === 0
+    const cols = zone?.columns || 4
+
+    // Ze support buttonu: nahoru -> search, doleva -> menu, dolů/doprava -> první karta
+    if (onSupportBtn && currentZone === 'main') {
+      if (e.key === 'ArrowUp') {
         e.preventDefault()
         searchInput?.focus()
+        return
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+        e.preventDefault()
+        focusStore.setActiveZone('sidemenu', false)
+        return
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        focusStore.setFocusedIndex(1) // První karta
+        return
+      }
+    }
+
+    // Šipka nahoru z prvního řádku karet -> support button (pokud existuje) nebo search
+    if (e.key === 'ArrowUp' && currentZone === 'main' && zone) {
+      // První řádek karet (indexy 1 až cols pokud je support btn, jinak 0 až cols-1)
+      const firstCardIndex = hasSupportBtn ? 1 : 0
+      const lastFirstRowIndex = hasSupportBtn ? cols : cols - 1
+
+      if (state.focusedIndex >= firstCardIndex && state.focusedIndex <= lastFirstRowIndex) {
+        e.preventDefault()
+        if (hasSupportBtn) {
+          focusStore.setFocusedIndex(0) // Jdi na support button
+        } else {
+          searchInput?.focus()
+        }
         return
       }
     }

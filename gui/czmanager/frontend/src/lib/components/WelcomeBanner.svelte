@@ -15,6 +15,7 @@
       </div>
       <Button
         variant="primary"
+        class="support-btn"
         onclick={() => window.open('https://lokalizace.net/support', '_blank')}
       >
         <Heart size={16} />

@@ -1,22 +1,37 @@
 <script lang="ts">
   import { Loader2 } from 'lucide-svelte'
+  import type { Snippet } from 'svelte'
 
-  export let variant: 'primary' | 'secondary' | 'danger' | 'ghost' = 'primary'
-  export let size: 'sm' | 'md' | 'lg' = 'md'
-  export let disabled = false
-  export let loading = false
-  export let onclick: (() => void) | undefined = undefined
+  let {
+    variant = 'primary',
+    size = 'md',
+    disabled = false,
+    loading = false,
+    onclick,
+    class: className = '',
+    children
+  }: {
+    variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
+    size?: 'sm' | 'md' | 'lg'
+    disabled?: boolean
+    loading?: boolean
+    onclick?: () => void
+    class?: string
+    children?: Snippet
+  } = $props()
 </script>
 
 <button
-  class="btn btn-{variant} btn-{size}"
+  class="btn btn-{variant} btn-{size} {className}"
   disabled={disabled || loading}
-  on:click={onclick}
+  onclick={onclick}
 >
   {#if loading}
     <Loader2 size={16} class="spinning" />
   {/if}
-  <slot />
+  {#if children}
+    {@render children()}
+  {/if}
 </button>
 
 <style>
@@ -27,9 +42,15 @@
     gap: 8px;
     border-radius: 8px;
     font-weight: 500;
-    border: none;
+    border: 2px solid transparent;
     cursor: pointer;
     transition: all 0.2s;
+    outline: none;
+  }
+
+  .btn:focus {
+    border-color: #f97316;
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
   }
 
   .btn:disabled {
@@ -44,6 +65,12 @@
 
   .btn-primary:hover:not(:disabled) {
     background: #ea580c;
+  }
+
+  .btn-primary:focus {
+    background: #ea580c;
+    border-color: white;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5);
   }
 
   .btn-secondary {
