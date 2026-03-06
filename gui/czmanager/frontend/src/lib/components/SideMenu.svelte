@@ -1,18 +1,24 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { Home, Settings, Heart, HelpCircle, Download } from 'lucide-svelte'
+  import { Home, Settings, Heart, HelpCircle, Download, LogIn, LogOut, User, Crown } from 'lucide-svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { agentStore } from '../stores/agent.svelte'
+  import { authStore } from '../stores/auth.svelte'
 
   let {
     activeItem = 'home',
     onNavigate = () => {},
-    collapsed = false
+    collapsed = false,
+    onLoginClick
   }: {
     activeItem?: string
     onNavigate?: (item: string) => void
     collapsed?: boolean
+    onLoginClick?: () => void
   } = $props()
+
+  let user = $derived($authStore.user)
+  let subscription = $derived($authStore.subscription)
 
   interface MenuItem {
     id: string
@@ -91,8 +97,47 @@
     {/each}
   </nav>
 
-  <!-- Agent status -->
+  <!-- User section -->
   <div class="menu-footer">
+    {#if user}
+      <!-- Logged in user -->
+      <div class="user-info">
+        <div class="user-avatar">
+          {#if user.avatar}
+            <img src={user.avatar} alt={user.username} />
+          {:else}
+            <User size={18} />
+          {/if}
+        </div>
+        {#if !collapsed}
+          <div class="user-details">
+            <span class="user-name">{user.username}</span>
+            {#if subscription}
+              <span class="user-tier" class:vip={subscription.tierSlug === 'vip'} class:supporter={subscription.tierSlug === 'supporter'}>
+                <Crown size={12} />
+                {subscription.tierSlug === 'vip' ? 'VIP' : 'Supporter'}
+              </span>
+            {/if}
+          </div>
+        {/if}
+      </div>
+      <button class="menu-item logout-btn" onclick={() => authStore.logout()}>
+        <LogOut size={20} />
+        {#if !collapsed}
+          <span class="menu-label">Odhlásit se</span>
+        {/if}
+      </button>
+    {:else}
+      <!-- Not logged in -->
+      <button class="menu-item login-btn" onclick={onLoginClick}>
+        <LogIn size={20} />
+        {#if !collapsed}
+          <span class="menu-label">Přihlásit se</span>
+        {/if}
+      </button>
+    {/if}
+
+    <!-- Agent status -->
     <div class="agent-status" class:connected={agentStatus === 'connected'}>
       <div class="status-dot"></div>
       {#if !collapsed}
@@ -231,5 +276,89 @@
     font-size: 13px;
     color: rgba(255, 255, 255, 0.6);
     white-space: nowrap;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .collapsed .user-info {
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-tier {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    width: fit-content;
+  }
+
+  .user-tier.vip {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+  }
+
+  .user-tier.supporter {
+    background: rgba(244, 114, 182, 0.2);
+    color: #f472b6;
+  }
+
+  .login-btn {
+    color: #f97316 !important;
+  }
+
+  .logout-btn {
+    color: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  .logout-btn:hover {
+    color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.1) !important;
   }
 </style>

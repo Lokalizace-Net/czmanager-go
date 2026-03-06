@@ -18,6 +18,26 @@ export namespace main {
 	        this.appId = source["appId"];
 	    }
 	}
+	export class LoginResult {
+	    accessToken: string;
+	    refreshToken: string;
+	    expiresAt: string;
+	    refreshExpiresAt: string;
+	    user: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoginResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accessToken = source["accessToken"];
+	        this.refreshToken = source["refreshToken"];
+	        this.expiresAt = source["expiresAt"];
+	        this.refreshExpiresAt = source["refreshExpiresAt"];
+	        this.user = source["user"];
+	    }
+	}
 
 }
 

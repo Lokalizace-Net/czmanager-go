@@ -6,15 +6,18 @@
   import GameGrid from './lib/components/GameGrid.svelte'
   import GameDetail from './lib/components/GameDetail.svelte'
   import Modal from './lib/components/Modal.svelte'
+  import LoginModal from './lib/components/LoginModal.svelte'
   import { agentStore } from './lib/stores/agent.svelte'
   import { gamesStore, type Localization } from './lib/stores/games.svelte'
   import { focusStore } from './lib/stores/focus.svelte'
+  import { authStore } from './lib/stores/auth.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
   import { StartAgent } from '../wailsjs/go/main/App'
   import { Loader2, Search } from 'lucide-svelte'
 
   let selectedGame = $state<Localization | null>(null)
   let showGameDetail = $state(false)
+  let showLoginModal = $state(false)
   let initializing = $state(true)
   let activeMenuItem = $state('home')
   let searchQuery = $state('')
@@ -41,6 +44,9 @@
 
     // Load games
     await gamesStore.fetchLocalizations(true)
+
+    // Initialize auth (check stored tokens)
+    await authStore.init()
 
     initializing = false
   })
@@ -180,6 +186,7 @@
   <SideMenu
     activeItem={activeMenuItem}
     onNavigate={handleMenuNavigate}
+    onLoginClick={() => showLoginModal = true}
   />
 
   <div class="main-area">
@@ -293,6 +300,12 @@
       <GameDetail game={selectedGame} onClose={handleCloseDetail} />
     {/if}
   </Modal>
+
+  <!-- Login Modal -->
+  <LoginModal
+    open={showLoginModal}
+    onClose={() => showLoginModal = false}
+  />
 </div>
 
 <style>

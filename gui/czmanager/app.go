@@ -443,6 +443,107 @@ func (a *App) ScanGames(gameName string) ([]DetectedGame, error) {
 	return result.Games, nil
 }
 
+// LoginResult represents the login response
+type LoginResult struct {
+	AccessToken      string                 `json:"accessToken"`
+	RefreshToken     string                 `json:"refreshToken"`
+	ExpiresAt        string                 `json:"expiresAt"`
+	RefreshExpiresAt string                 `json:"refreshExpiresAt"`
+	User             map[string]interface{} `json:"user"`
+}
+
+// Login authenticates user with lokalizace.net API
+func (a *App) Login(username string, password string) (*LoginResult, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	reqBody := fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, password)
+	resp, err := client.Post("https://lokalizace.net/api/auth/login", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("chyba připojení k serveru")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chyba čtení odpovědi")
+	}
+
+	if resp.StatusCode == 401 {
+		return nil, fmt.Errorf("neplatné přihlašovací údaje")
+	}
+	if resp.StatusCode == 403 {
+		return nil, fmt.Errorf("účet je zablokován")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("chyba serveru: %d", resp.StatusCode)
+	}
+
+	var result LoginResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("chyba parsování odpovědi")
+	}
+
+	return &result, nil
+}
+
+// RefreshToken refreshes the access token
+func (a *App) RefreshToken(refreshToken string) (*LoginResult, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	reqBody := fmt.Sprintf(`{"refreshToken": "%s"}`, refreshToken)
+	resp, err := client.Post("https://lokalizace.net/api/auth/refresh", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("chyba připojení k serveru")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("neplatný refresh token")
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chyba čtení odpovědi")
+	}
+
+	var result LoginResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("chyba parsování odpovědi")
+	}
+
+	return &result, nil
+}
+
+// FetchSubscription fetches subscription info for authenticated user
+func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	req, _ := http.NewRequest("GET", "https://lokalizace.net/api/subscription", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chyba připojení k serveru")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("chyba serveru: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chyba čtení odpovědi")
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("chyba parsování odpovědi")
+	}
+
+	return result, nil
+}
+
 // FetchGames fetches games from lokalizace.net API
 func (a *App) FetchGames(page int, limit int, search string) (map[string]interface{}, error) {
 	client := &http.Client{Timeout: 30 * time.Second}

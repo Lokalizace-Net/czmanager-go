@@ -30,6 +30,10 @@ export function FetchGames(arg1, arg2, arg3) {
   return window['go']['main']['App']['FetchGames'](arg1, arg2, arg3);
 }
 
+export function FetchSubscription(arg1) {
+  return window['go']['main']['App']['FetchSubscription'](arg1);
+}
+
 export function GetAgentPath() {
   return window['go']['main']['App']['GetAgentPath']();
 }
@@ -40,6 +44,14 @@ export function GetAgentStatus() {
 
 export function IsAgentInstalled() {
   return window['go']['main']['App']['IsAgentInstalled']();
+}
+
+export function Login(arg1, arg2) {
+  return window['go']['main']['App']['Login'](arg1, arg2);
+}
+
+export function RefreshToken(arg1) {
+  return window['go']['main']['App']['RefreshToken'](arg1);
 }
 
 export function ScanGames(arg1) {

@@ -16,11 +16,17 @@ export function FetchGameDetail(arg1:number):Promise<Record<string, any>>;
 
 export function FetchGames(arg1:number,arg2:number,arg3:string):Promise<Record<string, any>>;
 
+export function FetchSubscription(arg1:string):Promise<Record<string, any>>;
+
 export function GetAgentPath():Promise<string>;
 
 export function GetAgentStatus():Promise<Record<string, any>>;
 
 export function IsAgentInstalled():Promise<boolean>;
+
+export function Login(arg1:string,arg2:string):Promise<main.LoginResult>;
+
+export function RefreshToken(arg1:string):Promise<main.LoginResult>;
 
 export function ScanGames(arg1:string):Promise<Array<main.DetectedGame>>;
 
