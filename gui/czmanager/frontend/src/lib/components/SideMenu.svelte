@@ -19,6 +19,14 @@
 
   let user = $derived($authStore.user)
   let subscription = $derived($authStore.subscription)
+  let features = $derived($authStore.features)
+
+  // Debug
+  $effect(() => {
+    console.log('SideMenu - user:', user)
+    console.log('SideMenu - subscription:', subscription)
+    console.log('SideMenu - features:', features)
+  })
 
   interface MenuItem {
     id: string
@@ -35,6 +43,20 @@
   ]
 
   let menuButtons: HTMLButtonElement[] = []
+  let loginBtn = $state<HTMLButtonElement | undefined>(undefined)
+  let logoutBtn = $state<HTMLButtonElement | undefined>(undefined)
+
+  // Aktualizuj focus zónu když se změní stav přihlášení
+  function updateFocusElements() {
+    const validMenuButtons = menuButtons.filter(Boolean)
+    // Přidej login nebo logout button na konec
+    const authBtn = user ? logoutBtn : loginBtn
+    const allButtons = authBtn ? [...validMenuButtons, authBtn] : validMenuButtons
+
+    if (allButtons.length > 0) {
+      focusStore.updateZoneElements('sidemenu', allButtons)
+    }
+  }
 
   onMount(() => {
     // Registruj menu jako focus zónu
@@ -49,12 +71,14 @@
     })
 
     // Počkej na renderování a pak zaregistruj elementy
-    setTimeout(() => {
-      const validButtons = menuButtons.filter(Boolean)
-      if (validButtons.length > 0) {
-        focusStore.updateZoneElements('sidemenu', validButtons)
-      }
-    }, 200)
+    setTimeout(updateFocusElements, 200)
+  })
+
+  // Reaktivně aktualizuj když se změní user
+  $effect(() => {
+    // Sleduj změny user
+    const _ = user
+    setTimeout(updateFocusElements, 50)
   })
 
   onDestroy(() => {
@@ -112,16 +136,16 @@
         {#if !collapsed}
           <div class="user-details">
             <span class="user-name">{user.username}</span>
-            {#if subscription}
-              <span class="user-tier" class:vip={subscription.tierSlug === 'vip'} class:supporter={subscription.tierSlug === 'supporter'}>
+            {#if subscription?.tier}
+              <span class="user-tier" class:vip={subscription.tier.slug === 'vip'} class:supporter={subscription.tier.slug === 'supporter'}>
                 <Crown size={12} />
-                {subscription.tierSlug === 'vip' ? 'VIP' : 'Supporter'}
+                {subscription.tier.slug === 'vip' ? 'VIP' : 'Supporter'}
               </span>
             {/if}
           </div>
         {/if}
       </div>
-      <button class="menu-item logout-btn" onclick={() => authStore.logout()}>
+      <button bind:this={logoutBtn} class="menu-item logout-btn" onclick={() => authStore.logout()}>
         <LogOut size={20} />
         {#if !collapsed}
           <span class="menu-label">Odhlásit se</span>
@@ -129,7 +153,7 @@
       </button>
     {:else}
       <!-- Not logged in -->
-      <button class="menu-item login-btn" onclick={onLoginClick}>
+      <button bind:this={loginBtn} class="menu-item login-btn" onclick={onLoginClick}>
         <LogIn size={20} />
         {#if !collapsed}
           <span class="menu-label">Přihlásit se</span>
@@ -146,6 +170,14 @@
         </span>
       {/if}
     </div>
+
+    <!-- DEBUG - smazat později -->
+    {#if !collapsed && user}
+      <div style="font-size: 10px; color: #666; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 4px;">
+        <div>Sub: {subscription?.tier?.slug ?? 'null'}</div>
+        <div>Scanner: {features?.hasGameScanner ? 'ano' : 'ne'}</div>
+      </div>
+    {/if}
   </div>
 </aside>
 

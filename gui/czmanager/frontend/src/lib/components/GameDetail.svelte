@@ -4,6 +4,7 @@
   import type { Localization } from '../stores/games.svelte'
   import { agentStore } from '../stores/agent.svelte'
   import { focusStore } from '../stores/focus.svelte'
+  import { authStore } from '../stores/auth.svelte'
   import { BrowseFolder, ScanGames, StartAgent, FetchGameDetail, DownloadLocalization } from '../../../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
 
@@ -36,6 +37,9 @@
   let supportsAppInstall = $derived(game.supportsAppInstall === true)
   let isReady = $derived(game.status === 'released' || game.status === 'beta')
   let statusMessage = $derived(getInstallStatusMessage(game.status, progressPercent, supportsAppInstall))
+
+  // VIP/Supporter funkce - automatické hledání her
+  let canAutoScan = $derived($authStore.features?.hasGameScanner || false)
 
   function sanitizeHtml(html: string): string {
     if (!html) return ''
@@ -388,7 +392,10 @@
       }
     })
 
-    scanForGame()
+    // Automatické hledání her pouze pro VIP/Supporter uživatele
+    if (canAutoScan) {
+      scanForGame()
+    }
     // Počkáme na renderování a pak nastavíme focusables
     setTimeout(updateFocusables, 100)
   })
@@ -514,11 +521,13 @@
             <FolderOpen size={16} />
             <span>Procházet</span>
           </button>
-          <button class="btn-icon" onclick={scanForGame} disabled={installing || uninstalling || scanning} title="Automaticky vyhledat">
-            <RefreshCw size={16} class={scanning ? 'spinning' : ''} />
-          </button>
+          {#if canAutoScan}
+            <button class="btn-icon" onclick={scanForGame} disabled={installing || uninstalling || scanning} title="Automaticky vyhledat">
+              <RefreshCw size={16} class={scanning ? 'spinning' : ''} />
+            </button>
+          {/if}
         </div>
-        {#if detectedPath}
+        {#if detectedPath && canAutoScan}
           <p class="detected-msg">Hra byla automaticky nalezena</p>
         {/if}
       </div>

@@ -19,6 +19,7 @@ import (
 const (
 	AgentDownloadBaseURL = "https://lokalizace.net/downloads/agent"
 	AgentVersion         = "latest"
+	ApiBaseURL           = "https://lokalizace.net"
 )
 
 // App struct
@@ -457,7 +458,7 @@ func (a *App) Login(username string, password string) (*LoginResult, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	reqBody := fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, password)
-	resp, err := client.Post("https://lokalizace.net/api/auth/login", "application/json", strings.NewReader(reqBody))
+	resp, err := client.Post(ApiBaseURL+"/api/auth/login", "application/json", strings.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("chyba připojení k serveru")
 	}
@@ -491,7 +492,7 @@ func (a *App) RefreshToken(refreshToken string) (*LoginResult, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	reqBody := fmt.Sprintf(`{"refreshToken": "%s"}`, refreshToken)
-	resp, err := client.Post("https://lokalizace.net/api/auth/refresh", "application/json", strings.NewReader(reqBody))
+	resp, err := client.Post(ApiBaseURL+"/api/auth/refresh", "application/json", strings.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("chyba připojení k serveru")
 	}
@@ -518,8 +519,15 @@ func (a *App) RefreshToken(refreshToken string) (*LoginResult, error) {
 func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	req, _ := http.NewRequest("GET", "https://lokalizace.net/api/subscription", nil)
+	req, _ := http.NewRequest("GET", ApiBaseURL+"/api/subscription", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	// DEBUG
+	tokenLen := len(accessToken)
+	if tokenLen > 50 {
+		tokenLen = 50
+	}
+	fmt.Printf("FetchSubscription - token length: %d, first chars: %s\n", len(accessToken), accessToken[:tokenLen])
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -536,10 +544,15 @@ func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, err
 		return nil, fmt.Errorf("chyba čtení odpovědi")
 	}
 
+	// DEBUG - loguj surovou odpověď
+	fmt.Printf("Subscription API raw response: %s\n", string(body))
+
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("chyba parsování odpovědi")
 	}
+
+	fmt.Printf("Subscription API parsed: %+v\n", result)
 
 	return result, nil
 }
@@ -548,7 +561,7 @@ func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, err
 func (a *App) FetchGames(page int, limit int, search string) (map[string]interface{}, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	url := fmt.Sprintf("https://lokalizace.net/api/games?page=%d&limit=%d", page, limit)
+	url := fmt.Sprintf(ApiBaseURL+"/api/games?page=%d&limit=%d", page, limit)
 	if search != "" {
 		url += "&search=" + search
 	}
@@ -576,7 +589,7 @@ func (a *App) FetchGames(page int, limit int, search string) (map[string]interfa
 func (a *App) FetchGameDetail(gameId int) (map[string]interface{}, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	url := fmt.Sprintf("https://lokalizace.net/api/games/%d", gameId)
+	url := fmt.Sprintf(ApiBaseURL+"/api/games/%d", gameId)
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -645,7 +658,7 @@ func (a *App) DownloadLocalization(gameId int) (string, error) {
 	}
 
 	// Download URL
-	downloadURL := fmt.Sprintf("https://lokalizace.net/api/download/%d", fileId)
+	downloadURL := fmt.Sprintf(ApiBaseURL+"/api/download/%d", fileId)
 
 	// Emit progress
 	wailsruntime.EventsEmit(a.ctx, "download:progress", map[string]interface{}{
