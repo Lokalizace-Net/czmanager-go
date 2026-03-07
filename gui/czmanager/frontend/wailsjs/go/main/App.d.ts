@@ -12,6 +12,8 @@ export function DownloadAndStartAgent():Promise<void>;
 
 export function DownloadLocalization(arg1:number):Promise<string>;
 
+export function EnsureAgent():Promise<void>;
+
 export function FetchGameDetail(arg1:number):Promise<Record<string, any>>;
 
 export function FetchGames(arg1:number,arg2:number,arg3:string):Promise<Record<string, any>>;

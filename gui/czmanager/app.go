@@ -689,12 +689,14 @@ func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, err
 func (a *App) FetchGames(page int, limit int, search string) (map[string]interface{}, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	url := fmt.Sprintf(ApiBaseURL+"/api/games?page=%d&limit=%d", page, limit)
+	apiUrl := fmt.Sprintf(ApiBaseURL+"/api/games?page=%d&limit=%d", page, limit)
 	if search != "" {
-		url += "&search=" + search
+		// URL encode search string (handles spaces and special characters)
+		encoded := strings.ReplaceAll(search, " ", "+")
+		apiUrl += "&search=" + encoded
 	}
 
-	resp, err := client.Get(url)
+	resp, err := client.Get(apiUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch games: %v", err)
 	}

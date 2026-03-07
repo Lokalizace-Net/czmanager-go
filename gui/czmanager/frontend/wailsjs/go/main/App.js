@@ -22,6 +22,10 @@ export function DownloadLocalization(arg1) {
   return window['go']['main']['App']['DownloadLocalization'](arg1);
 }
 
+export function EnsureAgent() {
+  return window['go']['main']['App']['EnsureAgent']();
+}
+
 export function FetchGameDetail(arg1) {
   return window['go']['main']['App']['FetchGameDetail'](arg1);
 }
