@@ -7,17 +7,19 @@
   import GameDetail from './lib/components/GameDetail.svelte'
   import Modal from './lib/components/Modal.svelte'
   import LoginModal from './lib/components/LoginModal.svelte'
+  import LogPanel from './lib/components/LogPanel.svelte'
   import { agentStore } from './lib/stores/agent.svelte'
   import { gamesStore, type Localization } from './lib/stores/games.svelte'
   import { focusStore } from './lib/stores/focus.svelte'
   import { authStore } from './lib/stores/auth.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
   import { StartAgent } from '../wailsjs/go/main/App'
-  import { Loader2, Search } from 'lucide-svelte'
+  import { Loader2, Search, Terminal } from 'lucide-svelte'
 
   let selectedGame = $state<Localization | null>(null)
   let showGameDetail = $state(false)
   let showLoginModal = $state(false)
+  let showLogPanel = $state(false)
   let initializing = $state(true)
   let activeMenuItem = $state('home')
   let searchQuery = $state('')
@@ -306,6 +308,16 @@
     open={showLoginModal}
     onClose={() => showLoginModal = false}
   />
+
+  <!-- Log Panel Toggle -->
+  <button class="log-toggle" onclick={() => showLogPanel = !showLogPanel} title="Debug Log">
+    <Terminal size={16} />
+  </button>
+
+  <!-- Log Panel -->
+  {#if showLogPanel}
+    <LogPanel onClose={() => showLogPanel = false} />
+  {/if}
 </div>
 
 <style>
@@ -534,5 +546,28 @@
 
   .help-content a:hover {
     text-decoration: underline;
+  }
+
+  .log-toggle {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 999;
+  }
+
+  .log-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
   }
 </style>

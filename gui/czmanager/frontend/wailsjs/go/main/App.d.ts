@@ -22,6 +22,10 @@ export function GetAgentPath():Promise<string>;
 
 export function GetAgentStatus():Promise<Record<string, any>>;
 
+export function GetLogPath():Promise<string>;
+
+export function GetLogs():Promise<Array<string>>;
+
 export function IsAgentInstalled():Promise<boolean>;
 
 export function Login(arg1:string,arg2:string):Promise<main.LoginResult>;

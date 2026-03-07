@@ -27,6 +27,69 @@ type App struct {
 	ctx          context.Context
 	agentProcess *os.Process
 	agentPath    string
+	logFile      *os.File
+	logs         []string
+}
+
+// getLogPath returns path to log file
+func (a *App) getLogPath() string {
+	var baseDir string
+	if goruntime.GOOS == "windows" {
+		baseDir = os.Getenv("LOCALAPPDATA")
+		if baseDir == "" {
+			baseDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
+		}
+	} else {
+		baseDir = filepath.Join(os.Getenv("HOME"), ".local", "share")
+	}
+	return filepath.Join(baseDir, "CZManager", "gui.log")
+}
+
+// initLogging initializes log file
+func (a *App) initLogging() {
+	logPath := a.getLogPath()
+	os.MkdirAll(filepath.Dir(logPath), 0755)
+
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Printf("Failed to open log file: %v\n", err)
+		return
+	}
+	a.logFile = f
+	a.log("=== CZ Agent GUI started ===")
+}
+
+// log writes to log file and stores in memory
+func (a *App) log(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	line := fmt.Sprintf("[%s] %s", timestamp, msg)
+
+	fmt.Println(line)
+
+	a.logs = append(a.logs, line)
+	if len(a.logs) > 500 {
+		a.logs = a.logs[len(a.logs)-500:]
+	}
+
+	if a.logFile != nil {
+		a.logFile.WriteString(line + "\n")
+	}
+
+	// Emit to frontend
+	if a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, "log", line)
+	}
+}
+
+// GetLogs returns recent logs
+func (a *App) GetLogs() []string {
+	return a.logs
+}
+
+// GetLogPath returns the log file path
+func (a *App) GetLogPath() string {
+	return a.getLogPath()
 }
 
 // DetectedGame represents a detected game installation
@@ -45,7 +108,33 @@ func NewApp() *App {
 // startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.initLogging()
+	a.log("Searching for agent...")
 	a.findAgentPath()
+	if a.agentPath != "" {
+		a.log("Agent found at: %s", a.agentPath)
+	} else {
+		a.log("Agent not found - will download automatically when needed")
+	}
+}
+
+// EnsureAgent checks if agent exists, downloads if not
+func (a *App) EnsureAgent() error {
+	if a.agentPath != "" {
+		return nil
+	}
+
+	a.log("Agent not found, downloading...")
+	wailsruntime.EventsEmit(a.ctx, "agent:status", "downloading")
+
+	if err := a.DownloadAgent(); err != nil {
+		a.log("ERROR: Failed to download agent: %v", err)
+		return err
+	}
+
+	a.agentPath = a.getAgentInstallPath()
+	a.log("Agent downloaded to: %s", a.agentPath)
+	return nil
 }
 
 // shutdown is called when the app closes
@@ -57,17 +146,20 @@ func (a *App) shutdown(ctx context.Context) {
 func (a *App) findAgentPath() {
 	// First check the standard install location
 	installPath := a.getAgentInstallPath()
+	a.log("Checking install path: %s", installPath)
 	if _, err := os.Stat(installPath); err == nil {
 		a.agentPath = installPath
-		fmt.Printf("Found agent at install location: %s\n", installPath)
+		a.log("Found agent at install location")
 		return
 	}
 
 	execPath, err := os.Executable()
 	if err != nil {
+		a.log("ERROR: Cannot get executable path: %v", err)
 		return
 	}
 	execDir := filepath.Dir(execPath)
+	a.log("GUI executable dir: %s", execDir)
 
 	// Agent binary name based on OS
 	agentName := "czmanager-agent"
@@ -94,9 +186,10 @@ func (a *App) findAgentPath() {
 	}
 
 	for _, path := range possiblePaths {
+		a.log("Checking: %s", path)
 		if _, err := os.Stat(path); err == nil {
 			a.agentPath = path
-			fmt.Printf("Found agent at: %s\n", path)
+			a.log("Found agent at: %s", path)
 			return
 		}
 	}
@@ -108,7 +201,7 @@ func (a *App) findAgentPath() {
 func (a *App) StartAgent() error {
 	// First check if agent is already running
 	if a.isAgentRunning() {
-		fmt.Println("Agent is already running")
+		a.log("Agent is already running")
 		return nil
 	}
 
@@ -118,33 +211,68 @@ func (a *App) StartAgent() error {
 	}
 
 	if a.agentPath == "" {
-		fmt.Println("Agent executable not found")
+		a.log("ERROR: Agent executable not found")
 		return fmt.Errorf("agent not found - please ensure czmanager-agent is in the build directory")
 	}
 
-	fmt.Printf("Starting agent from: %s\n", a.agentPath)
+	a.log("Starting agent from: %s", a.agentPath)
+
+	// Check if file exists
+	if _, err := os.Stat(a.agentPath); os.IsNotExist(err) {
+		a.log("ERROR: Agent file does not exist: %s", a.agentPath)
+		return fmt.Errorf("agent file not found: %s", a.agentPath)
+	}
 
 	cmd := exec.Command(a.agentPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+
+	// Capture stdout/stderr
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
 
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("Failed to start agent: %v\n", err)
+		a.log("ERROR: Failed to start agent: %v", err)
 		return fmt.Errorf("failed to start agent: %v", err)
 	}
 
 	a.agentProcess = cmd.Process
-	fmt.Printf("Agent process started with PID: %d\n", cmd.Process.Pid)
+	a.log("Agent process started with PID: %d", cmd.Process.Pid)
+
+	// Read agent output in background
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := stdout.Read(buf)
+			if n > 0 {
+				a.log("[Agent] %s", strings.TrimSpace(string(buf[:n])))
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := stderr.Read(buf)
+			if n > 0 {
+				a.log("[Agent ERR] %s", strings.TrimSpace(string(buf[:n])))
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
 
 	// Wait for agent to be ready
 	for i := 0; i < 50; i++ {
 		if a.isAgentRunning() {
-			fmt.Println("Agent is now running and responding")
+			a.log("Agent is now running and responding on port 17892")
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	a.log("ERROR: Agent did not respond within 5 seconds")
 	return fmt.Errorf("agent did not start in time")
 }
 

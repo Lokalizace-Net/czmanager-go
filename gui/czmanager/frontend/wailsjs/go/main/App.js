@@ -42,6 +42,14 @@ export function GetAgentStatus() {
   return window['go']['main']['App']['GetAgentStatus']();
 }
 
+export function GetLogPath() {
+  return window['go']['main']['App']['GetLogPath']();
+}
+
+export function GetLogs() {
+  return window['go']['main']['App']['GetLogs']();
+}
+
 export function IsAgentInstalled() {
   return window['go']['main']['App']['IsAgentInstalled']();
 }
