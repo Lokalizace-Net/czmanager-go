@@ -68,17 +68,32 @@ jobs:
         working-directory: gui/czmanager
         run: move build\bin\cz-agent-gui.exe build\bin\${{ matrix.output }}
 
-      - name: Rename output (Unix)
-        if: runner.os != 'Windows'
+      - name: Rename output (Linux)
+        if: runner.os == 'Linux'
         working-directory: gui/czmanager
-        run: mv build/bin/cz-agent-gui* build/bin/${{ matrix.output }}
+        run: mv build/bin/cz-agent-gui build/bin/${{ matrix.output }}
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        working-directory: gui/czmanager
+        run: |
+          cd build/bin
+          zip -r ${{ matrix.output }}.zip *.app
 
       # Upload artifact
-      - name: Upload artifact
+      - name: Upload artifact (Windows/Linux)
+        if: runner.os != 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
           path: gui/czmanager/build/bin/${{ matrix.output }}
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: gui/czmanager/build/bin/${{ matrix.output }}.zip
 
   # Create release when tag is pushed
   release:
