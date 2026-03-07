@@ -24,6 +24,8 @@ export function GetAgentPath():Promise<string>;
 
 export function GetAgentStatus():Promise<Record<string, any>>;
 
+export function GetImageBase64(arg1:string):Promise<string>;
+
 export function GetLogPath():Promise<string>;
 
 export function GetLogs():Promise<Array<string>>;

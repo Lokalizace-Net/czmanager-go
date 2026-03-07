@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -854,4 +855,34 @@ func (a *App) DownloadLocalization(gameId int) (string, error) {
 	})
 
 	return destPath, nil
+}
+
+// GetImageBase64 fetches image from URL and returns as base64 data URL
+func (a *App) GetImageBase64(imageUrl string) (string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Get(imageUrl)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("image fetch failed: %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Detect content type
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = http.DetectContentType(data)
+	}
+
+	// Convert to base64 data URL
+	encoded := base64.StdEncoding.EncodeToString(data)
+	return fmt.Sprintf("data:%s;base64,%s", contentType, encoded), nil
 }

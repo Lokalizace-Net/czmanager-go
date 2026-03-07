@@ -46,6 +46,10 @@ export function GetAgentStatus() {
   return window['go']['main']['App']['GetAgentStatus']();
 }
 
+export function GetImageBase64(arg1) {
+  return window['go']['main']['App']['GetImageBase64'](arg1);
+}
+
 export function GetLogPath() {
   return window['go']['main']['App']['GetLogPath']();
 }

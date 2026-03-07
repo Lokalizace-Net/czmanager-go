@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Localization } from '../stores/games.svelte'
+  import { GetImageBase64 } from '../../../wailsjs/go/main/App'
+  import { onMount } from 'svelte'
 
   let {
     game,
@@ -15,6 +17,21 @@
 
   let imageError = $state(false)
   let imageLoaded = $state(false)
+  let imageSrc = $state('')
+
+  // Load image via Go backend (avoids CORS issues)
+  onMount(async () => {
+    if (game.imageUrl) {
+      try {
+        const base64 = await GetImageBase64(game.imageUrl)
+        imageSrc = base64
+        imageLoaded = true
+      } catch (e) {
+        console.error('Failed to load image:', game.imageUrl, e)
+        imageError = true
+      }
+    }
+  })
 
   function getStatusLabel(status: string): string {
     switch (status) {
@@ -47,15 +64,17 @@
 >
   <!-- Cover Image -->
   <div class="card-image">
-    {#if !imageError && game.imageUrl}
+    {#if !imageError && imageSrc}
       <img
-        src={game.imageUrl}
+        src={imageSrc}
         alt={game.name}
         class:loaded={imageLoaded}
-        onerror={() => imageError = true}
-        onload={() => imageLoaded = true}
-        loading="lazy"
       />
+    {:else if !imageError && !imageLoaded}
+      <!-- Loading state -->
+      <div class="placeholder loading">
+        <div class="spinner"></div>
+      </div>
     {:else}
       <div class="placeholder">
         <span>{game.name.charAt(0)}</span>
@@ -145,6 +164,23 @@
     font-size: 48px;
     font-weight: bold;
     color: rgba(255, 255, 255, 0.1);
+  }
+
+  .placeholder.loading {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+  }
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #f97316;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   .status-badge {
