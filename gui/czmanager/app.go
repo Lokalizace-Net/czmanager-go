@@ -857,6 +857,104 @@ func (a *App) DownloadLocalization(gameId int) (string, error) {
 	return destPath, nil
 }
 
+// FetchFavorites fetches user's favorite games from lokalizace.net API
+func (a *App) FetchFavorites(accessToken string) (map[string]interface{}, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	req, _ := http.NewRequest("GET", ApiBaseURL+"/api/favorites", nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chyba připojení k serveru")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("chyba serveru: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chyba čtení odpovědi")
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("chyba parsování odpovědi")
+	}
+
+	return result, nil
+}
+
+// AddFavorite adds a game to favorites via POST /api/favorites
+func (a *App) AddFavorite(accessToken string, gameId int) (map[string]interface{}, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	reqBody := fmt.Sprintf(`{"gameId": %d}`, gameId)
+	req, _ := http.NewRequest("POST", ApiBaseURL+"/api/favorites", strings.NewReader(reqBody))
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chyba připojení k serveru")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chyba čtení odpovědi")
+	}
+
+	if resp.StatusCode == 403 {
+		return nil, fmt.Errorf("%s", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("chyba serveru: %d", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("chyba parsování odpovědi")
+	}
+
+	return result, nil
+}
+
+// RemoveFavorite removes a game from favorites via DELETE /api/favorites
+func (a *App) RemoveFavorite(accessToken string, gameId int) (map[string]interface{}, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	reqBody := fmt.Sprintf(`{"gameId": %d}`, gameId)
+	req, _ := http.NewRequest("DELETE", ApiBaseURL+"/api/favorites", strings.NewReader(reqBody))
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chyba připojení k serveru")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chyba čtení odpovědi")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("chyba serveru: %d", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("chyba parsování odpovědi")
+	}
+
+	return result, nil
+}
+
 // GetImageBase64 fetches image from URL and returns as base64 data URL
 func (a *App) GetImageBase64(imageUrl string) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}

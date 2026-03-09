@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, WifiOff, Play } from 'lucide-svelte'
+  import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, WifiOff, Play, Heart } from 'lucide-svelte'
   import type { Localization } from '../stores/games.svelte'
   import { agentStore } from '../stores/agent.svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
+  import { favoritesStore } from '../stores/favorites.svelte'
   import { BrowseFolder, ScanGames, StartAgent, FetchGameDetail, DownloadLocalization } from '../../../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
 
@@ -40,6 +41,10 @@
 
   // VIP/Supporter funkce - automatické hledání her
   let canAutoScan = $derived($authStore.features?.hasGameScanner || false)
+
+  // Oblíbené
+  let isFav = $derived($favoritesStore.ids.includes(game.id))
+  let isLoggedIn = $derived(!!$authStore.user)
 
   function sanitizeHtml(html: string): string {
     if (!html) return ''
@@ -444,10 +449,22 @@
           </div>
         </div>
 
-        <button class="web-link" onclick={openOnWeb}>
-          <ExternalLink size={12} />
-          Zobrazit na webu
-        </button>
+        <div class="header-actions">
+          {#if isLoggedIn}
+            <button
+              class="favorite-link"
+              class:active={isFav}
+              onclick={() => favoritesStore.toggleFavorite(game.id)}
+            >
+              <Heart size={14} fill={isFav ? 'currentColor' : 'none'} />
+              {isFav ? 'V oblíbených' : 'Přidat do oblíbených'}
+            </button>
+          {/if}
+          <button class="web-link" onclick={openOnWeb}>
+            <ExternalLink size={12} />
+            Zobrazit na webu
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -796,6 +813,33 @@
 
   .progress-fill.complete {
     background: #22c55e;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .favorite-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s;
+  }
+
+  .favorite-link:hover {
+    color: #ef4444;
+  }
+
+  .favorite-link.active {
+    color: #ef4444;
   }
 
   .web-link {

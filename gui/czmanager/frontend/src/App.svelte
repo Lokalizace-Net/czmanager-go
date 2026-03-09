@@ -8,13 +8,15 @@
   import Modal from './lib/components/Modal.svelte'
   import LoginModal from './lib/components/LoginModal.svelte'
   import LogPanel from './lib/components/LogPanel.svelte'
+  import GameCard from './lib/components/GameCard.svelte'
   import { agentStore } from './lib/stores/agent.svelte'
   import { gamesStore, type Localization } from './lib/stores/games.svelte'
   import { focusStore } from './lib/stores/focus.svelte'
   import { authStore } from './lib/stores/auth.svelte'
+  import { favoritesStore, favoriteLocalizations } from './lib/stores/favorites.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
-  import { StartAgent } from '../wailsjs/go/main/App'
-  import { Loader2, Search, Terminal } from 'lucide-svelte'
+  import { StartAgent, FetchGameDetail } from '../wailsjs/go/main/App'
+  import { Loader2, Search, Terminal, Heart } from 'lucide-svelte'
 
   let selectedGame = $state<Localization | null>(null)
   let showGameDetail = $state(false)
@@ -24,6 +26,27 @@
   let activeMenuItem = $state('home')
   let searchQuery = $state('')
   let searchInput = $state<HTMLInputElement | undefined>(undefined)
+  let favGridElement = $state<HTMLElement | undefined>(undefined)
+
+  // Registruj focus zónu pro favorites grid když se změní obsah
+  $effect(() => {
+    const favs = $favoriteLocalizations
+    if (activeMenuItem === 'favorites' && favGridElement && favs.length > 0) {
+      setTimeout(() => {
+        if (!favGridElement) return
+        const cards = Array.from(favGridElement.querySelectorAll('.game-card')) as HTMLButtonElement[]
+        const width = favGridElement.clientWidth
+        const cols = Math.max(2, Math.min(8, Math.floor((width + 20) / 240)))
+        focusStore.registerZone({
+          id: 'main',
+          elements: cards,
+          columns: cols,
+          loop: false,
+          onEscape: () => focusStore.setActiveZone('sidemenu', false)
+        })
+      }, 50)
+    }
+  })
 
   onMount(async () => {
     // Start gamepad polling
@@ -50,6 +73,9 @@
     // Initialize auth (check stored tokens)
     await authStore.init()
 
+    // Načti oblíbené z API pokud je uživatel přihlášen
+    await favoritesStore.fetchFromApi()
+
     initializing = false
   })
 
@@ -62,6 +88,59 @@
     selectedGame = game
     showGameDetail = true
     focusStore.setActiveZone('modal')
+  }
+
+  const API_BASE = 'https://lokalizace.net'
+
+  function mapStatus(status: string): Localization['status'] {
+    const m: Record<string, Localization['status']> = {
+      'draft': 'draft', 'translating': 'translating', 'alpha': 'wip', 'open_beta': 'beta', 'public': 'released'
+    }
+    return m[status?.toLowerCase()] || 'wip'
+  }
+
+  async function handleFavoriteGameSelect(favGame: Localization) {
+    // Nejprve zkus najít hru v hlavním games storu (má plná data)
+    const fromStore = $gamesStore.localizations.find(g => g.id === favGame.id)
+    if (fromStore) {
+      handleGameSelect(fromStore)
+      return
+    }
+
+    // Jinak načti plný detail z API
+    try {
+      const detail = await FetchGameDetail(favGame.id)
+      const item = detail as any
+      const status = mapStatus(item.status)
+      const availability = item.availability || 'web_only'
+
+      const fullGame: Localization = {
+        id: item.id,
+        slug: item.slug,
+        name: item.name,
+        description: item.story || '',
+        imageUrl: item.thumbnail ? `${API_BASE}${item.thumbnail}` : favGame.imageUrl,
+        heroImageUrl: item.heroImage ? `${API_BASE}${item.heroImage}` : undefined,
+        status,
+        version: item.version || '1.0.0',
+        downloadUrl: item.downloadUrl || undefined,
+        teamName: item.teamName,
+        teamSlug: item.teamSlug,
+        translatePercent: item.translatePercent || 0,
+        correctionPercent: item.correctionPercent || 0,
+        testingPercent: item.testingPercent || 0,
+        rating: item.rating,
+        totalRatings: item.totalRatings,
+        availability,
+        supportsAppInstall: availability === 'app_only' || availability === 'both'
+      }
+
+      handleGameSelect(fullGame)
+    } catch (e) {
+      console.error('Failed to fetch game detail:', e)
+      // Fallback — otevři s neúplnými daty
+      handleGameSelect(favGame)
+    }
   }
 
   function handleCloseDetail() {
@@ -233,8 +312,56 @@
 
         {:else if activeMenuItem === 'favorites'}
           <div class="page-content">
-            <h1 class="page-title">Oblíbené</h1>
-            <p class="page-empty">Zatím nemáte žádné oblíbené lokalizace.</p>
+            <div class="favorites-header">
+              <h1 class="page-title">Oblíbené</h1>
+              {#if $authStore.user && $authStore.features}
+                <span class="favorites-count">
+                  {$favoritesStore.ids.length} / {$authStore.features.maxFavorites}
+                </span>
+              {/if}
+            </div>
+
+            {#if $favoritesStore.limitError}
+              <div class="favorites-limit-msg">
+                <Heart size={16} />
+                <span>{$favoritesStore.limitError}</span>
+                <button class="limit-dismiss" onclick={() => favoritesStore.clearLimitError()}>×</button>
+              </div>
+            {/if}
+
+            {#if !$authStore.user}
+              <div class="favorites-empty">
+                <Heart size={48} />
+                <p class="empty-title">Pro používání oblíbených se přihlaste</p>
+                <button class="btn-login" onclick={() => showLoginModal = true}>Přihlásit se</button>
+              </div>
+            {:else if $favoriteLocalizations.length === 0}
+              <div class="favorites-empty">
+                <Heart size={48} />
+                <p class="empty-title">Zatím nemáte žádné oblíbené lokalizace</p>
+                <p class="empty-hint">Klikněte na srdíčko u libovolné hry pro přidání do oblíbených.</p>
+              </div>
+            {:else}
+              <div class="favorites-grid" bind:this={favGridElement}>
+                {#each $favoriteLocalizations as game, index (game.id)}
+                  <GameCard
+                    {game}
+                    focused={$focusStore.activeZone === 'main' && $focusStore.focusedIndex === index}
+                    isFavorite={true}
+                    showFavoriteBtn={true}
+                    onclick={() => {
+                      focusStore.setFocusedIndex(index)
+                      handleFavoriteGameSelect(game)
+                    }}
+                    onfocus={() => {
+                      focusStore.setActiveZone('main', false)
+                      focusStore.setFocusedIndex(index)
+                    }}
+                    onToggleFavorite={() => favoritesStore.toggleFavorite(game.id)}
+                  />
+                {/each}
+              </div>
+            {/if}
           </div>
 
         {:else if activeMenuItem === 'downloads'}
@@ -459,6 +586,99 @@
   .page-empty {
     color: rgba(255, 255, 255, 0.4);
     font-size: 16px;
+  }
+
+  .favorites-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .favorites-header .page-title {
+    margin: 0;
+  }
+
+  .favorites-count {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+
+  .favorites-limit-msg {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 10px;
+    color: #fbbf24;
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .limit-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .limit-dismiss:hover {
+    color: white;
+  }
+
+  .favorites-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 0;
+    color: rgba(255, 255, 255, 0.2);
+  }
+
+  .favorites-empty .empty-title {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 20px 0 8px;
+  }
+
+  .favorites-empty .empty-hint {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.3);
+    margin: 0;
+  }
+
+  .btn-login {
+    margin-top: 20px;
+    height: 44px;
+    padding: 0 32px;
+    background: #f97316;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-login:hover {
+    background: #ea580c;
+  }
+
+  .favorites-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
   }
 
   .settings-grid {

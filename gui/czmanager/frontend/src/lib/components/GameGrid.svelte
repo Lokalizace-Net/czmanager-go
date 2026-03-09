@@ -4,6 +4,8 @@
   import GameCard from './GameCard.svelte'
   import { gamesStore, filteredLocalizations, type Localization } from '../stores/games.svelte'
   import { focusStore } from '../stores/focus.svelte'
+  import { favoritesStore } from '../stores/favorites.svelte'
+  import { authStore } from '../stores/auth.svelte'
   import { Loader2 } from 'lucide-svelte'
 
   let { onGameSelect }: { onGameSelect?: (game: Localization) => void } = $props()
@@ -137,8 +139,11 @@
     <GameCard
       {game}
       focused={isMainActive && focusedIndex === (hasSupportButton ? index + 1 : index)}
+      isFavorite={$favoritesStore.ids.includes(game.id)}
+      showFavoriteBtn={!!$authStore.user}
       onclick={() => handleCardClick(game, index)}
       onfocus={() => handleCardFocus(index)}
+      onToggleFavorite={() => favoritesStore.toggleFavorite(game.id)}
     />
   {/each}
 </div>

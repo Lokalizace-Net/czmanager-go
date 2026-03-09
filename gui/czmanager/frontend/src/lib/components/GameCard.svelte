@@ -2,17 +2,24 @@
   import type { Localization } from '../stores/games.svelte'
   import { GetImageBase64 } from '../../../wailsjs/go/main/App'
   import { onMount } from 'svelte'
+  import { Heart } from 'lucide-svelte'
 
   let {
     game,
     focused = false,
+    isFavorite = false,
+    showFavoriteBtn = false,
     onclick,
-    onfocus
+    onfocus,
+    onToggleFavorite
   }: {
     game: Localization
     focused?: boolean
+    isFavorite?: boolean
+    showFavoriteBtn?: boolean
     onclick?: () => void
     onfocus?: () => void
+    onToggleFavorite?: () => void
   } = $props()
 
   let imageError = $state(false)
@@ -78,6 +85,22 @@
     {:else}
       <div class="placeholder">
         <span>{game.name.charAt(0)}</span>
+      </div>
+    {/if}
+
+    <!-- Favorite button - top left -->
+    {#if showFavoriteBtn}
+      <!-- svelte-ignore node_invalid_placement_ssr -->
+      <div
+        class="favorite-btn"
+        class:active={isFavorite}
+        role="button"
+        tabindex="-1"
+        onclick={(e) => { e.stopPropagation(); onToggleFavorite?.() }}
+        onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onToggleFavorite?.() } }}
+        title={isFavorite ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
+      >
+        <Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} />
       </div>
     {/if}
 
@@ -181,6 +204,42 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .favorite-btn {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    border: none;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 2;
+    opacity: 0;
+  }
+
+  .game-card:hover .favorite-btn,
+  .game-card.focused .favorite-btn,
+  .favorite-btn.active {
+    opacity: 1;
+  }
+
+  .favorite-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+    color: #ef4444;
+    transform: scale(1.1);
+  }
+
+  .favorite-btn.active {
+    color: #ef4444;
   }
 
   .status-badge {

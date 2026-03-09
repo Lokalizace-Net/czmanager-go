@@ -13,6 +13,7 @@ Komunikuje s webovou aplikací [Lokalizace.NET](https://lokalizace.net) a lokál
 ## Funkce
 
 - **Prohlížení lokalizací** — přehledný grid s kartami her, vyhledávání a filtrování
+- **Oblíbené** — možnost přidat hry do oblíbených pro rychlý přístup
 - **Instalace / odinstalace** — stažení a aplikace lokalizačních patchů jedním kliknutím
 - **Detekce her** — automatické rozpoznání nainstalovaných her (Steam, Epic Games, GOG, Origin, Ubisoft Connect)
 - **Progress & logy** — real-time progress bar a log výstup během instalace

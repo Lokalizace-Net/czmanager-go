@@ -1,6 +1,7 @@
 <script lang="ts">
   import { X, User, Lock, Loader2, AlertCircle, Crown, Heart } from 'lucide-svelte'
   import { authStore } from '../stores/auth.svelte'
+  import { favoritesStore } from '../stores/favorites.svelte'
 
   let {
     open = false,
@@ -39,6 +40,8 @@
     if (success) {
       username = ''
       password = ''
+      // Načti oblíbené z API po přihlášení
+      favoritesStore.fetchFromApi()
       onClose?.()
     }
   }
