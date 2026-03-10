@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=CZ Manager
+GenericName=Game Localization Manager
+Comment=Správce českých lokalizací her od Lokalizace.NET
+Exec=cz-agent-gui
+Icon=net.lokalizace.CZManager
+Terminal=false
+Type=Application
+Categories=Game;Utility;
+Keywords=localization;czech;games;translation;lokalizace;
+StartupWMClass=cz-agent-gui

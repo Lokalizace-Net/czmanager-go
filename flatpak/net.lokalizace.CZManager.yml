@@ -1,0 +1,46 @@
+app-id: net.lokalizace.CZManager
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: cz-agent-gui
+
+finish-args:
+  # Display
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+
+  # Network (API komunikace s lokalizace.net + lokální agent)
+  - --share=network
+
+  # Přístup k herním souborům pro instalaci lokalizací
+  - --filesystem=home
+  - --filesystem=/media:ro
+  - --filesystem=/run/media:ro
+  - --filesystem=/mnt:ro
+
+  # Steam a další herní platformy
+  - --filesystem=~/.steam:rw
+  - --filesystem=~/.local/share/Steam:rw
+
+  # XDG portály pro dialogy
+  - --talk-name=org.freedesktop.portal.FileChooser
+
+modules:
+  - name: czmanager
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 cz-agent-gui /app/bin/cz-agent-gui
+      - install -Dm644 net.lokalizace.CZManager.desktop /app/share/applications/net.lokalizace.CZManager.desktop
+      - install -Dm644 net.lokalizace.CZManager.metainfo.xml /app/share/metainfo/net.lokalizace.CZManager.metainfo.xml
+      - install -Dm644 icon-256.png /app/share/icons/hicolor/256x256/apps/net.lokalizace.CZManager.png
+    sources:
+      - type: file
+        path: cz-agent-gui
+      - type: file
+        path: net.lokalizace.CZManager.desktop
+      - type: file
+        path: net.lokalizace.CZManager.metainfo.xml
+      - type: file
+        path: icon-256.png
