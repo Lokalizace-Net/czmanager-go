@@ -43,7 +43,12 @@ function processGamepad() {
         const buttonName = BUTTON_MAP[i as keyof typeof BUTTON_MAP]
         if (buttonName) {
           state.lastInput = now
-          focusStore.handleGamepadInput(buttonName)
+          if (buttonName === 'y') {
+            // Y = toggle favorite — dispatch custom event
+            window.dispatchEvent(new CustomEvent('gamepad:favorite'))
+          } else {
+            focusStore.handleGamepadInput(buttonName)
+          }
         }
       }
     }

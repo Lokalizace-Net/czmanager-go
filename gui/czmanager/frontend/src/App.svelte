@@ -48,9 +48,20 @@
     }
   })
 
+  function handleGamepadFavorite() {
+    if (!$authStore.user) return
+    const game = getFocusedGame()
+    if (game) {
+      favoritesStore.toggleFavorite(game.id)
+    }
+  }
+
   onMount(async () => {
     // Start gamepad polling
     startGamepadPolling()
+
+    // Gamepad Y = toggle favorite
+    window.addEventListener('gamepad:favorite', handleGamepadFavorite)
 
     // Start agent via Wails
     try {
@@ -82,6 +93,7 @@
   onDestroy(() => {
     agentStore.stopHealthCheck()
     stopGamepadPolling()
+    window.removeEventListener('gamepad:favorite', handleGamepadFavorite)
   })
 
   function handleGameSelect(game: Localization) {
@@ -248,16 +260,52 @@
 
     // Escape nebo šipka doleva z main (i prázdného) -> sidemenu
     if ((e.key === 'Escape' || e.key === 'ArrowLeft') && currentZone === 'main') {
-      // Pokud nejsme na home stránce nebo nemáme zónu, jdi rovnou na menu
-      if (!zone || zone.elements.length === 0 || activeMenuItem !== 'home') {
+      // Escape vždy jde na menu, ArrowLeft jen pokud jsme na levém kraji gridu nebo nemáme elementy
+      if (!zone || zone.elements.length === 0) {
+        e.preventDefault()
+        focusStore.setActiveZone('sidemenu', false)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        focusStore.setActiveZone('sidemenu', false)
+        return
+      }
+      // ArrowLeft -> menu jen pokud jsme na levém okraji (první sloupec)
+      if (e.key === 'ArrowLeft' && state.focusedIndex % cols === 0) {
         e.preventDefault()
         focusStore.setActiveZone('sidemenu', false)
         return
       }
     }
 
+    // F = toggle oblíbené na fokusnuté kartě
+    if ((e.key === 'f' || e.key === 'F') && currentZone === 'main' && $authStore.user) {
+      e.preventDefault()
+      const focusedGame = getFocusedGame()
+      if (focusedGame) {
+        favoritesStore.toggleFavorite(focusedGame.id)
+      }
+      return
+    }
+
     // Vše ostatní deleguj na focusStore
     focusStore.handleKeydown(e)
+  }
+
+  // Získej hru na aktuálně fokusnutém indexu
+  function getFocusedGame(): Localization | null {
+    const idx = $focusStore.focusedIndex
+    if (activeMenuItem === 'favorites') {
+      const favs = $favoriteLocalizations
+      return favs[idx] || null
+    }
+    // Na home stránce - offset kvůli support buttonu
+    const zone = $focusStore.zones.get('main')
+    const hasSupportBtn = zone?.elements[0]?.classList.contains('support-btn')
+    const gameIdx = hasSupportBtn ? idx - 1 : idx
+    const games = $gamesStore.localizations
+    return games[gameIdx] || null
   }
 </script>
 
