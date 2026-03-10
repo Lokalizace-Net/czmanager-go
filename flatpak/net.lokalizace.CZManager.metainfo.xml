@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>net.lokalizace.CZManager</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary=https://lokalizace.net/terms</project_license>
+
+  <name>CZ Manager</name>
+  <summary>Správce českých lokalizací her od Lokalizace.NET</summary>
+
+  <developer id="net.lokalizace">
+    <name>Lokalizace.NET</name>
+  </developer>
+
+  <description>
+    <p>
+      CZ Manager je desktopová aplikace pro správu a instalaci českých herních lokalizací
+      z komunity Lokalizace.NET. Umožňuje procházet katalog lokalizací, spravovat oblíbené
+      a jedním kliknutím instalovat české překlady do vašich her.
+    </p>
+    <p>
+      Aplikace automaticky detekuje nainstalované hry ze Steamu, Epic Games, GOG a dalších
+      platforem. Podporuje ovládání gamepadem pro pohodlné použití na Steam Decku.
+    </p>
+    <ul>
+      <li>Procházení a vyhledávání v katalogu českých lokalizací</li>
+      <li>Automatická detekce nainstalovaných her</li>
+      <li>Instalace a odinstalace lokalizací jedním kliknutím</li>
+      <li>Podpora gamepadu (Steam Deck, Xbox controller)</li>
+      <li>Správa oblíbených lokalizací</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">net.lokalizace.CZManager.desktop</launchable>
+
+  <categories>
+    <category>Game</category>
+    <category>Utility</category>
+  </categories>
+
+  <keywords>
+    <keyword>localization</keyword>
+    <keyword>czech</keyword>
+    <keyword>games</keyword>
+    <keyword>translation</keyword>
+    <keyword>lokalizace</keyword>
+    <keyword>steam deck</keyword>
+  </keywords>
+
+  <url type="homepage">https://lokalizace.net</url>
+  <url type="bugtracker">https://github.com/Lokalizace-Net/czmanager-gui/issues</url>
+  <url type="vcs-browser">https://github.com/Lokalizace-Net/czmanager-gui</url>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#6366f1</color>
+    <color type="primary" scheme_preference="dark">#4f46e5</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Lokalizace-Net/czmanager-gui/main/flatpak/screenshots/favorites.png</image>
+      <caption>Oblíbené lokalizace s přehledem stavu překladu</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Lokalizace-Net/czmanager-gui/main/flatpak/screenshots/home.png</image>
+      <caption>Katalog českých lokalizací her</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Lokalizace-Net/czmanager-gui/main/flatpak/screenshots/login.png</image>
+      <caption>Přihlášení účtem z Lokalizace.NET</caption>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.5.3" date="2026-03-10">
+      <description>
+        <p>Podpora Flatpak, správa oblíbených, ovládání gamepadem.</p>
+      </description>
+    </release>
+  </releases>
+
+  <requires>
+    <internet>always</internet>
+  </requires>
+</component>
