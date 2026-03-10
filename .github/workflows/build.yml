@@ -153,3 +153,51 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-flathub-manifest:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download Linux binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cz-agent-gui-linux-amd64
+          path: /tmp/
+
+      - name: Update Flathub manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BINARY="/tmp/cz-agent-gui-linux-amd64"
+          SHA256=$(sha256sum "$BINARY" | cut -d' ' -f1)
+          SIZE=$(stat -c%s "$BINARY")
+          URL="https://github.com/Lokalizace-Net/czmanager-gui/releases/download/${GITHUB_REF_NAME}/cz-agent-gui-linux-amd64"
+
+          echo "Version: $VERSION"
+          echo "SHA256: $SHA256"
+          echo "Size: $SIZE"
+          echo "URL: $URL"
+
+          MANIFEST="flatpak/flathub/net.lokalizace.CZManager.yml"
+          sed -i "s|sha256: .*|sha256: ${SHA256}|" "$MANIFEST"
+          sed -i "s|size: .*|size: ${SIZE}|" "$MANIFEST"
+          sed -i "s|url: https://github.com/.*/download/.*|url: ${URL}|" "$MANIFEST"
+
+          echo "Updated manifest:"
+          grep -A3 "extra-data" "$MANIFEST"
+
+      - name: Commit updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add flatpak/flathub/net.lokalizace.CZManager.yml
+          git commit -m "Update Flathub manifest for ${GITHUB_REF_NAME}" || echo "No changes"
+          git push origin main
