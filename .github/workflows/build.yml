@@ -173,13 +173,21 @@ jobs:
           name: cz-agent-gui-linux-amd64
           path: /tmp/
 
+      - name: Upload binary to lokalizace.net
+        run: |
+          curl -X PUT \
+            -H "Authorization: Bearer ${{ secrets.LOKALIZACE_DEPLOY_TOKEN }}" \
+            -F "file=@/tmp/cz-agent-gui-linux-amd64" \
+            "https://lokalizace.net/api/deploy/czmanager/cz-agent-gui-linux-amd64" \
+            || echo "Upload to lokalizace.net failed - upload manually"
+
       - name: Update Flathub manifest
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           BINARY="/tmp/cz-agent-gui-linux-amd64"
           SHA256=$(sha256sum "$BINARY" | cut -d' ' -f1)
           SIZE=$(stat -c%s "$BINARY")
-          URL="https://github.com/Lokalizace-Net/czmanager-gui/releases/download/${GITHUB_REF_NAME}/cz-agent-gui-linux-amd64"
+          URL="https://lokalizace.net/downloads/czmanager/cz-agent-gui-linux-amd64"
 
           echo "Version: $VERSION"
           echo "SHA256: $SHA256"
@@ -189,7 +197,6 @@ jobs:
           MANIFEST="flatpak/flathub/net.lokalizace.CZManager.yml"
           sed -i "s|sha256: .*|sha256: ${SHA256}|" "$MANIFEST"
           sed -i "s|size: .*|size: ${SIZE}|" "$MANIFEST"
-          sed -i "s|url: https://github.com/.*/download/.*|url: ${URL}|" "$MANIFEST"
 
           echo "Updated manifest:"
           grep -A3 "extra-data" "$MANIFEST"
