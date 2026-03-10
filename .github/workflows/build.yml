@@ -1,4 +1,4 @@
-name: Build CZ Agent GUI
+name: Build & Release
 
 on:
   push:
@@ -46,23 +46,19 @@ jobs:
         with:
           node-version: '20'
 
-      # Linux dependencies
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 
-      # Install Wails
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      # Build
       - name: Build
         working-directory: gui/czmanager
         run: wails build -platform ${{ matrix.platform }}
 
-      # Rename output
       - name: Rename output (Windows)
         if: runner.os == 'Windows'
         working-directory: gui/czmanager
@@ -80,7 +76,6 @@ jobs:
           cd build/bin
           zip -r ${{ matrix.output }}.zip *.app
 
-      # Upload artifact
       - name: Upload artifact (Windows/Linux)
         if: runner.os != 'macOS'
         uses: actions/upload-artifact@v4
@@ -95,9 +90,43 @@ jobs:
           name: ${{ matrix.output }}
           path: gui/czmanager/build/bin/${{ matrix.output }}.zip
 
-  # Create release when tag is pushed
-  release:
+  flatpak:
     needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:gnome-46
+      options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Linux AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: cz-agent-gui-linux-amd64
+          path: flatpak/
+
+      - name: Prepare binary
+        run: |
+          mv flatpak/cz-agent-gui-linux-amd64 flatpak/cz-agent-gui
+          chmod +x flatpak/cz-agent-gui
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/net.lokalizace.CZManager.yml
+          bundle: CZManager.flatpak
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Upload Flatpak bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: CZManager-flatpak
+          path: CZManager.flatpak
+
+  release:
+    needs: [build, flatpak]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
