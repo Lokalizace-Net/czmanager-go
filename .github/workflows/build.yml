@@ -137,11 +137,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: false
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.flatpak" -o -name "cz-agent-gui-linux-*" \) -exec cp {} release/ \;
+          echo "Release files:"
+          ls -la release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: release/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
