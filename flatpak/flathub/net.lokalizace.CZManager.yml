@@ -60,5 +60,5 @@ modules:
       - type: extra-data
         filename: cz-agent-gui
         url: https://app.lokalizace.net/czagentgui/cz-agent-gui-linux-amd64
-        sha256: FILL_SHA256_HERE
-        size: FILL_SIZE_HERE
+        sha256: 4b020c3755050e8a57ed753fb3611c8a46d3c21770d679f34c6ff024cd5126cf
+        size: 9480392
