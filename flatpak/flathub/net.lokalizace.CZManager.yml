@@ -59,6 +59,6 @@ modules:
       # Binary stažená při instalaci (extra-data)
       - type: extra-data
         filename: cz-agent-gui
-        url: https://lokalizace.net/downloads/czmanager/cz-agent-gui-linux-amd64
+        url: https://app.lokalizace.net/czagentgui/cz-agent-gui-linux-amd64
         sha256: FILL_SHA256_HERE
         size: FILL_SIZE_HERE
