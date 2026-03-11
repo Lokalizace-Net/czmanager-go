@@ -178,7 +178,7 @@ jobs:
           curl -X PUT \
             -H "Authorization: Bearer ${{ secrets.LOKALIZACE_DEPLOY_TOKEN }}" \
             -F "file=@/tmp/cz-agent-gui-linux-amd64" \
-            "https://lokalizace.net/api/deploy/czmanager/cz-agent-gui-linux-amd64" \
+            "https://app.lokalizace.net/czagentgui/cz-agent-gui-linux-amd64" \
             || echo "Upload to lokalizace.net failed - upload manually"
 
       - name: Update Flathub manifest
@@ -187,7 +187,7 @@ jobs:
           BINARY="/tmp/cz-agent-gui-linux-amd64"
           SHA256=$(sha256sum "$BINARY" | cut -d' ' -f1)
           SIZE=$(stat -c%s "$BINARY")
-          URL="https://lokalizace.net/downloads/czmanager/cz-agent-gui-linux-amd64"
+          URL="https://app.lokalizace.net/czagentgui/cz-agent-gui-linux-amd64"
 
           echo "Version: $VERSION"
           echo "SHA256: $SHA256"
