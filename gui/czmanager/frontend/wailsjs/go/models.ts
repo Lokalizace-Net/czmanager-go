@@ -1,5 +1,21 @@
 export namespace main {
 	
+	export class AgentStatus {
+	    running: boolean;
+	    version: string;
+	    busy: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.version = source["version"];
+	        this.busy = source["busy"];
+	    }
+	}
 	export class DetectedGame {
 	    name: string;
 	    path: string;
