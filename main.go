@@ -6,24 +6,41 @@ import (
 	"czmanager-agent/models"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 const (
-	Version  = "1.4.0"
-	Port     = 17892
-	TokenEnv = "CZMANAGER_TOKEN"
+	Version    = "1.4.0"
+	Port       = 17892
+	TokenEnv   = "CZMANAGER_TOKEN"
+	OriginsEnv = "CZMANAGER_ALLOWED_ORIGINS"
 )
 
 var (
 	authToken        string
 	installerService *installer.Service
+
+	// allowedOrigins is the set of web origins permitted to read agent
+	// responses via CORS. The agent is a local HTTP server reachable from any
+	// page the user's browser visits, so a wildcard "*" would let any website
+	// read the auth token from /ping and drive the agent. Lock it to our own
+	// domains. Overridable via CZMANAGER_ALLOWED_ORIGINS (comma-separated) for
+	// development.
+	allowedOrigins = []string{
+		"https://lokalizace.net",
+		"https://www.lokalizace.net",
+		"https://app.lokalizace.net",
+	}
 )
 
 func main() {
@@ -67,6 +84,16 @@ func main() {
 		fmt.Printf("Set environment variable %s=%s to persist\n", TokenEnv, authToken)
 	}
 
+	// Allow overriding the CORS origin whitelist (e.g. for local development)
+	if envOrigins := os.Getenv(OriginsEnv); envOrigins != "" {
+		allowedOrigins = nil
+		for _, o := range strings.Split(envOrigins, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				allowedOrigins = append(allowedOrigins, o)
+			}
+		}
+	}
+
 	// Initialize installer service with xdelta path
 	installerService = installer.NewService(getXdeltaPath())
 
@@ -91,8 +118,20 @@ func main() {
 	fmt.Printf("CZManager Agent v%s starting on %s\n", Version, addr)
 	fmt.Printf("OS: %s, Arch: %s\n", runtime.GOOS, runtime.GOARCH)
 
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Bind the port ourselves so we can give a clear message when it is already
+	// in use (e.g. a previous agent instance is still running) instead of a raw
+	// system error. A duplicate instance is expected, not fatal.
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		if errors.Is(err, syscall.EADDRINUSE) || strings.Contains(err.Error(), "address already in use") || strings.Contains(err.Error(), "Only one usage of each socket address") {
+			fmt.Printf("Port %d is already in use - another CZManager agent instance is likely already running. Exiting.\n", Port)
+			return
+		}
+		log.Fatalf("Failed to listen on %s: %v", addr, err)
+	}
+
+	if err := http.Serve(listener, nil); err != nil {
+		log.Fatalf("Server stopped: %v", err)
 	}
 }
 
@@ -104,12 +143,39 @@ func generateToken() string {
 	return hex.EncodeToString(bytes)
 }
 
+// setCORS reflects the request Origin back only if it is in the whitelist.
+// Returns false when the origin is present but not allowed, so callers can
+// reject the request entirely. A missing Origin header (non-browser clients
+// like the web app's server side, curl, the updater) is allowed through.
+func setCORS(w http.ResponseWriter, r *http.Request, methods string) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// No Origin: not a browser cross-origin request. Auth token still applies.
+		w.Header().Set("Access-Control-Allow-Methods", methods)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		return true
+	}
+
+	if slices.Contains(allowedOrigins, origin) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+		w.Header().Set("Access-Control-Allow-Methods", methods)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		return true
+	}
+
+	// Origin present but not whitelisted: do not emit ACAO. The browser will
+	// block the response, and we reject the request outright.
+	return false
+}
+
 // Middleware for CORS
 func withCORS(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if !setCORS(w, r, "GET, POST, OPTIONS") {
+			writeJSON(w, http.StatusForbidden, models.ErrorResponse{Error: "Origin not allowed"})
+			return
+		}
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -148,9 +214,10 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 
 // GET /ping - public endpoint
 func handlePing(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if !setCORS(w, r, "GET, OPTIONS") {
+		writeJSON(w, http.StatusForbidden, models.ErrorResponse{Error: "Origin not allowed"})
+		return
+	}
 
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)

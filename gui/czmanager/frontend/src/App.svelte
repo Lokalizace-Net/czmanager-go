@@ -210,8 +210,13 @@
       return
     }
 
-    // Ignoruj ostatní inputy
-    if (inInput) return
+    // Ostatní inputy (např. "Cesta ke hře" v modalu): deleguj na focusStore,
+    // který u šipek nahoru/dolů + Escape vyskočí z inputu ven, ale šipky
+    // vlevo/vpravo nechá nativní (pohyb kurzoru v textu).
+    if (inInput) {
+      focusStore.handleKeydown(e)
+      return
+    }
 
     const currentZone = $focusStore.activeZone
     const state = $focusStore
