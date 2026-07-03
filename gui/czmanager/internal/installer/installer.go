@@ -2,7 +2,7 @@ package installer
 
 import (
 	"archive/zip"
-	"czmanager-agent/models"
+	"czmanager/internal/models"
 	"encoding/json"
 	"fmt"
 	"io"

@@ -14,20 +14,12 @@ export function BrowseFolder(arg1) {
   return window['go']['main']['App']['BrowseFolder'](arg1);
 }
 
-export function DownloadAgent() {
-  return window['go']['main']['App']['DownloadAgent']();
-}
-
-export function DownloadAndStartAgent() {
-  return window['go']['main']['App']['DownloadAndStartAgent']();
+export function CancelInstall() {
+  return window['go']['main']['App']['CancelInstall']();
 }
 
 export function DownloadLocalization(arg1) {
   return window['go']['main']['App']['DownloadLocalization'](arg1);
-}
-
-export function EnsureAgent() {
-  return window['go']['main']['App']['EnsureAgent']();
 }
 
 export function FetchFavorites(arg1) {
@@ -46,10 +38,6 @@ export function FetchSubscription(arg1) {
   return window['go']['main']['App']['FetchSubscription'](arg1);
 }
 
-export function GetAgentPath() {
-  return window['go']['main']['App']['GetAgentPath']();
-}
-
 export function GetAgentStatus() {
   return window['go']['main']['App']['GetAgentStatus']();
 }
@@ -66,8 +54,12 @@ export function GetLogs() {
   return window['go']['main']['App']['GetLogs']();
 }
 
-export function IsAgentInstalled() {
-  return window['go']['main']['App']['IsAgentInstalled']();
+export function Install(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['Install'](arg1, arg2, arg3, arg4);
+}
+
+export function IsBusy() {
+  return window['go']['main']['App']['IsBusy']();
 }
 
 export function Login(arg1, arg2) {
@@ -86,10 +78,6 @@ export function ScanGames(arg1) {
   return window['go']['main']['App']['ScanGames'](arg1);
 }
 
-export function StartAgent() {
-  return window['go']['main']['App']['StartAgent']();
-}
-
-export function StopAgent() {
-  return window['go']['main']['App']['StopAgent']();
+export function Uninstall(arg1) {
+  return window['go']['main']['App']['Uninstall'](arg1);
 }

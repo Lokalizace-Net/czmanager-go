@@ -8,13 +8,9 @@ export function BrowseFile(arg1:string,arg2:string):Promise<string>;
 
 export function BrowseFolder(arg1:string):Promise<string>;
 
-export function DownloadAgent():Promise<void>;
-
-export function DownloadAndStartAgent():Promise<void>;
+export function CancelInstall():Promise<void>;
 
 export function DownloadLocalization(arg1:number):Promise<string>;
-
-export function EnsureAgent():Promise<void>;
 
 export function FetchFavorites(arg1:string):Promise<Record<string, any>>;
 
@@ -24,9 +20,7 @@ export function FetchGames(arg1:number,arg2:number,arg3:string):Promise<Record<s
 
 export function FetchSubscription(arg1:string):Promise<Record<string, any>>;
 
-export function GetAgentPath():Promise<string>;
-
-export function GetAgentStatus():Promise<Record<string, any>>;
+export function GetAgentStatus():Promise<main.AgentStatus>;
 
 export function GetImageBase64(arg1:string):Promise<string>;
 
@@ -34,7 +28,9 @@ export function GetLogPath():Promise<string>;
 
 export function GetLogs():Promise<Array<string>>;
 
-export function IsAgentInstalled():Promise<boolean>;
+export function Install(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function IsBusy():Promise<boolean>;
 
 export function Login(arg1:string,arg2:string):Promise<main.LoginResult>;
 
@@ -44,6 +40,4 @@ export function RemoveFavorite(arg1:string,arg2:number):Promise<Record<string, a
 
 export function ScanGames(arg1:string):Promise<Array<main.DetectedGame>>;
 
-export function StartAgent():Promise<void>;
-
-export function StopAgent():Promise<void>;
+export function Uninstall(arg1:string):Promise<void>;

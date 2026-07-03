@@ -8,28 +8,30 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
 	"time"
 
+	"czmanager/internal/installer"
+	"czmanager/internal/models"
+	"czmanager/internal/scanner"
+	"czmanager/internal/xdelta"
+
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
-	AgentDownloadBaseURL = "https://lokalizace.net/downloads/agent"
-	AgentVersion         = "latest"
-	ApiBaseURL           = "https://lokalizace.net"
+	AgentVersion = "latest"
+	ApiBaseURL   = "https://lokalizace.net"
 )
 
 // App struct
 type App struct {
-	ctx          context.Context
-	agentProcess *os.Process
-	agentPath    string
-	logFile      *os.File
-	logs         []string
+	ctx       context.Context
+	logFile   *os.File
+	logs      []string
+	installer *installer.Service
 }
 
 // getLogPath returns path to log file
@@ -110,384 +112,137 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.initLogging()
-	a.log("Searching for agent...")
-	a.findAgentPath()
-	if a.agentPath != "" {
-		a.log("Agent found at: %s", a.agentPath)
-	} else {
-		a.log("Agent not found - will download automatically when needed")
+
+	// Prepare the embedded xdelta3 binary and the installer service. The
+	// installer runs in-process now - there is no separate agent binary.
+	xdelta.CleanupOldDirs()
+	if err := xdelta.Extract(); err != nil {
+		a.log("Warning: failed to extract xdelta: %v", err)
 	}
-}
-
-// EnsureAgent checks if agent exists, downloads if not
-func (a *App) EnsureAgent() error {
-	if a.agentPath != "" {
-		return nil
-	}
-
-	a.log("Agent not found, downloading...")
-	wailsruntime.EventsEmit(a.ctx, "agent:status", "downloading")
-
-	if err := a.DownloadAgent(); err != nil {
-		a.log("ERROR: Failed to download agent: %v", err)
-		return err
-	}
-
-	a.agentPath = a.getAgentInstallPath()
-	a.log("Agent downloaded to: %s", a.agentPath)
-	return nil
+	a.installer = installer.NewService(xdelta.Path())
+	a.log("Installer service ready (in-process)")
 }
 
 // shutdown is called when the app closes
 func (a *App) shutdown(ctx context.Context) {
-	a.StopAgent()
-}
-
-// findAgentPath locates the agent executable
-func (a *App) findAgentPath() {
-	// First check the standard install location
-	installPath := a.getAgentInstallPath()
-	a.log("Checking install path: %s", installPath)
-	if _, err := os.Stat(installPath); err == nil {
-		a.agentPath = installPath
-		a.log("Found agent at install location")
-		return
+	if a.installer != nil {
+		a.installer.Cancel()
 	}
-
-	execPath, err := os.Executable()
-	if err != nil {
-		a.log("ERROR: Cannot get executable path: %v", err)
-		return
-	}
-	execDir := filepath.Dir(execPath)
-	a.log("GUI executable dir: %s", execDir)
-
-	// Agent binary name based on OS
-	agentName := "czmanager-agent"
-	agentNameWithArch := "czmanager-agent"
-	if goruntime.GOOS == "windows" {
-		agentName = "czmanager-agent.exe"
-		agentNameWithArch = "czmanager-agent-windows-amd64.exe"
-	} else if goruntime.GOOS == "linux" {
-		agentNameWithArch = "czmanager-agent-linux-amd64"
-	} else if goruntime.GOOS == "darwin" {
-		agentNameWithArch = "czmanager-agent-macos-amd64"
-	}
-
-	// Get working directory for development mode
-	workDir, _ := os.Getwd()
-
-	// Look for agent in various locations (development paths)
-	possiblePaths := []string{
-		filepath.Join(execDir, agentName),
-		filepath.Join(execDir, agentNameWithArch),
-		filepath.Join(workDir, "build", agentNameWithArch),
-		filepath.Join(workDir, "..", "build", agentNameWithArch),
-		filepath.Join(workDir, "..", "..", "build", agentNameWithArch),
-	}
-
-	for _, path := range possiblePaths {
-		a.log("Checking: %s", path)
-		if _, err := os.Stat(path); err == nil {
-			a.agentPath = path
-			a.log("Found agent at: %s", path)
-			return
-		}
-	}
-
-	fmt.Println("Agent not found - will need to download")
-}
-
-// StartAgent starts the agent process
-func (a *App) StartAgent() error {
-	// First check if agent is already running
-	if a.isAgentRunning() {
-		a.log("Agent is already running")
-		return nil
-	}
-
-	// Try to find agent path again if not set
-	if a.agentPath == "" {
-		a.findAgentPath()
-	}
-
-	if a.agentPath == "" {
-		a.log("ERROR: Agent executable not found")
-		return fmt.Errorf("agent not found - please ensure czmanager-agent is in the build directory")
-	}
-
-	a.log("Starting agent from: %s", a.agentPath)
-
-	// Check if file exists
-	if _, err := os.Stat(a.agentPath); os.IsNotExist(err) {
-		a.log("ERROR: Agent file does not exist: %s", a.agentPath)
-		return fmt.Errorf("agent file not found: %s", a.agentPath)
-	}
-
-	cmd := exec.Command(a.agentPath)
-
-	// Capture stdout/stderr
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
-
-	if err := cmd.Start(); err != nil {
-		a.log("ERROR: Failed to start agent: %v", err)
-		return fmt.Errorf("failed to start agent: %v", err)
-	}
-
-	a.agentProcess = cmd.Process
-	a.log("Agent process started with PID: %d", cmd.Process.Pid)
-
-	// Read agent output in background
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := stdout.Read(buf)
-			if n > 0 {
-				a.log("[Agent] %s", strings.TrimSpace(string(buf[:n])))
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := stderr.Read(buf)
-			if n > 0 {
-				a.log("[Agent ERR] %s", strings.TrimSpace(string(buf[:n])))
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-
-	// Wait for agent to be ready
-	for i := 0; i < 50; i++ {
-		if a.isAgentRunning() {
-			a.log("Agent is now running and responding on port 17892")
-			return nil
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	a.log("ERROR: Agent did not respond within 5 seconds")
-	return fmt.Errorf("agent did not start in time")
-}
-
-// StopAgent stops the agent process
-func (a *App) StopAgent() {
-	if a.agentProcess != nil {
-		a.agentProcess.Kill()
-		a.agentProcess = nil
+	if a.logFile != nil {
+		a.logFile.Close()
 	}
 }
 
-// GetAgentPath returns the expected agent path
-func (a *App) GetAgentPath() string {
-	return a.getAgentInstallPath()
+// --- Installer bindings (in-process, replaces the former HTTP agent) ---
+
+// AgentStatus mirrors the old /status response so the frontend keeps a
+// stable shape. The agent is always "running" now because it is in-process.
+type AgentStatus struct {
+	Running bool   `json:"running"`
+	Version string `json:"version"`
+	Busy    bool   `json:"busy"`
 }
 
-// getAgentInstallPath returns the path where agent should be installed
-func (a *App) getAgentInstallPath() string {
-	// Get user's local app data directory
-	var baseDir string
-	if goruntime.GOOS == "windows" {
-		baseDir = os.Getenv("LOCALAPPDATA")
-		if baseDir == "" {
-			baseDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
-		}
-	} else if goruntime.GOOS == "darwin" {
-		baseDir = filepath.Join(os.Getenv("HOME"), "Library", "Application Support")
-	} else {
-		baseDir = filepath.Join(os.Getenv("HOME"), ".local", "share")
+// GetAgentStatus reports installer availability. Kept for frontend compat.
+func (a *App) GetAgentStatus() AgentStatus {
+	return AgentStatus{
+		Running: a.installer != nil,
+		Version: AgentVersion,
+		Busy:    a.installer != nil && a.installer.IsBusy(),
 	}
-
-	agentDir := filepath.Join(baseDir, "CZManager")
-
-	// Agent binary name
-	agentName := "czmanager-agent"
-	if goruntime.GOOS == "windows" {
-		agentName = "czmanager-agent.exe"
-	}
-
-	return filepath.Join(agentDir, agentName)
 }
 
-// getAgentDownloadURL returns the download URL for current platform
-func (a *App) getAgentDownloadURL() string {
-	var platform string
-	switch goruntime.GOOS {
-	case "windows":
-		platform = "windows-amd64.exe"
-	case "darwin":
-		platform = "macos-amd64"
-	case "linux":
-		if goruntime.GOARCH == "arm64" {
-			platform = "linux-arm64"
-		} else {
-			platform = "linux-amd64"
-		}
-	default:
-		platform = "linux-amd64"
-	}
-
-	return fmt.Sprintf("%s/czmanager-agent-%s", AgentDownloadBaseURL, platform)
+// IsBusy reports whether an install/uninstall is currently running.
+func (a *App) IsBusy() bool {
+	return a.installer != nil && a.installer.IsBusy()
 }
 
-// IsAgentInstalled checks if agent is installed
-func (a *App) IsAgentInstalled() bool {
-	agentPath := a.getAgentInstallPath()
-	_, err := os.Stat(agentPath)
-	return err == nil
-}
-
-// DownloadAgent downloads the agent from the web
-func (a *App) DownloadAgent() error {
-	agentPath := a.getAgentInstallPath()
-	agentDir := filepath.Dir(agentPath)
-
-	// Create directory if not exists
-	if err := os.MkdirAll(agentDir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
+// Install starts a localization install and streams progress/logs to the
+// frontend via the "install:progress" and "install:log" events.
+func (a *App) Install(gameSlug, version, downloadURL, gameRoot string) error {
+	if a.installer == nil {
+		return fmt.Errorf("installer not ready")
 	}
-
-	// Download URL
-	downloadURL := a.getAgentDownloadURL()
-	fmt.Printf("Downloading agent from: %s\n", downloadURL)
-
-	// Emit progress event
-	wailsruntime.EventsEmit(a.ctx, "agent:download:progress", map[string]interface{}{
-		"status":  "downloading",
-		"percent": 0,
-	})
-
-	// Create HTTP request
-	resp, err := http.Get(downloadURL)
-	if err != nil {
-		return fmt.Errorf("failed to download: %v", err)
+	req := models.InstallRequest{
+		GameSlug:    gameSlug,
+		Version:     version,
+		DownloadURL: downloadURL,
+		GameRoot:    gameRoot,
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed with status: %d", resp.StatusCode)
+	if err := a.installer.Install(req); err != nil {
+		return err
 	}
-
-	// Get content length for progress
-	contentLength := resp.ContentLength
-
-	// Create temp file
-	tmpFile, err := os.CreateTemp(agentDir, "agent-download-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp file: %v", err)
-	}
-	tmpPath := tmpFile.Name()
-
-	// Download with progress
-	var downloaded int64
-	buf := make([]byte, 32*1024)
-	for {
-		n, err := resp.Body.Read(buf)
-		if n > 0 {
-			if _, writeErr := tmpFile.Write(buf[:n]); writeErr != nil {
-				tmpFile.Close()
-				os.Remove(tmpPath)
-				return fmt.Errorf("failed to write: %v", writeErr)
-			}
-			downloaded += int64(n)
-
-			if contentLength > 0 {
-				percent := int(float64(downloaded) / float64(contentLength) * 100)
-				wailsruntime.EventsEmit(a.ctx, "agent:download:progress", map[string]interface{}{
-					"status":  "downloading",
-					"percent": percent,
-				})
-			}
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			tmpFile.Close()
-			os.Remove(tmpPath)
-			return fmt.Errorf("download error: %v", err)
-		}
-	}
-	tmpFile.Close()
-
-	// Remove old agent if exists
-	os.Remove(agentPath)
-
-	// Rename temp file to final path
-	if err := os.Rename(tmpPath, agentPath); err != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("failed to install agent: %v", err)
-	}
-
-	// Make executable on Unix
-	if goruntime.GOOS != "windows" {
-		os.Chmod(agentPath, 0755)
-	}
-
-	// Update agent path
-	a.agentPath = agentPath
-
-	wailsruntime.EventsEmit(a.ctx, "agent:download:progress", map[string]interface{}{
-		"status":  "complete",
-		"percent": 100,
-	})
-
-	fmt.Printf("Agent installed to: %s\n", agentPath)
+	go a.streamProgress()
 	return nil
 }
 
-// DownloadAndStartAgent downloads agent if needed and starts it
-func (a *App) DownloadAndStartAgent() error {
-	// Check if already running
-	if a.isAgentRunning() {
-		return nil
+// Uninstall removes a previously installed localization from gameRoot.
+func (a *App) Uninstall(gameRoot string) error {
+	if a.installer == nil {
+		return fmt.Errorf("installer not ready")
 	}
+	req := models.UninstallRequest{GameRoot: gameRoot}
+	if err := a.installer.Uninstall(req); err != nil {
+		return err
+	}
+	go a.streamProgress()
+	return nil
+}
 
-	// Check if installed
-	if !a.IsAgentInstalled() {
-		if err := a.DownloadAgent(); err != nil {
-			return err
+// CancelInstall cancels the current install/uninstall operation.
+func (a *App) CancelInstall() {
+	if a.installer != nil {
+		a.installer.Cancel()
+	}
+}
+
+// streamProgress polls the installer service and emits progress + new log
+// lines to the frontend until the operation reaches a terminal stage. This
+// replaces the old HTTP polling the frontend did against /progress and /logs.
+func (a *App) streamProgress() {
+	sentLogs := 0
+	for {
+		// Flush any new log lines first so the UI stays in sync.
+		newLogs := a.installer.GetLogs(sentLogs)
+		for _, entry := range newLogs {
+			wailsruntime.EventsEmit(a.ctx, "install:log", entry.Message)
 		}
-	}
+		sentLogs += len(newLogs)
 
-	// Update path and start
-	a.agentPath = a.getAgentInstallPath()
-	return a.StartAgent()
+		progress := a.installer.GetProgress()
+		wailsruntime.EventsEmit(a.ctx, "install:progress", progress)
+
+		if progress.Stage == models.StageDone || progress.Stage == models.StageError {
+			return
+		}
+		if !a.installer.IsBusy() {
+			// Safety net: operation ended without a terminal stage.
+			wailsruntime.EventsEmit(a.ctx, "install:progress", a.installer.GetProgress())
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 }
 
-// isAgentRunning checks if the agent is responding
-func (a *App) isAgentRunning() bool {
-	client := &http.Client{Timeout: 1 * time.Second}
-	resp, err := client.Get("http://127.0.0.1:17892/ping")
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
-}
-
-// GetAgentStatus returns the agent status
-func (a *App) GetAgentStatus() (map[string]interface{}, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("http://127.0.0.1:17892/ping")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+// ScanGames scans for installed games matching the name (in-process).
+func (a *App) ScanGames(gameName string) ([]DetectedGame, error) {
+	var found []scanner.InstalledGame
+	if gameName != "" {
+		found = scanner.FindGameByName(gameName)
+	} else {
+		found = scanner.ScanForGames().Games
 	}
 
-	return result, nil
+	games := make([]DetectedGame, 0, len(found))
+	for _, g := range found {
+		games = append(games, DetectedGame{
+			Name:     g.Name,
+			Path:     g.Path,
+			Platform: g.Platform,
+			AppID:    g.AppID,
+		})
+	}
+	return games, nil
 }
 
 // BrowseFolder opens a folder selection dialog
@@ -533,44 +288,6 @@ func (a *App) BrowseFile(title string, filters string) (string, error) {
 	}
 
 	return path, nil
-}
-
-// ScanGames scans for installed games matching the name
-func (a *App) ScanGames(gameName string) ([]DetectedGame, error) {
-	// For now, delegate to agent
-	client := &http.Client{Timeout: 30 * time.Second}
-
-	// Get token first
-	pingResp, err := client.Get("http://127.0.0.1:17892/ping")
-	if err != nil {
-		return nil, err
-	}
-	defer pingResp.Body.Close()
-
-	var pingData map[string]interface{}
-	json.NewDecoder(pingResp.Body).Decode(&pingData)
-	token, _ := pingData["token"].(string)
-
-	// Create request
-	reqBody := fmt.Sprintf(`{"game_name": "%s"}`, gameName)
-	req, _ := http.NewRequest("POST", "http://127.0.0.1:17892/scan-games", strings.NewReader(reqBody))
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Games []DetectedGame `json:"games"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	return result.Games, nil
 }
 
 // LoginResult represents the login response
