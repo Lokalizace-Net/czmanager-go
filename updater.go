@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -37,6 +38,18 @@ type AgentVersionResponse struct {
 	FileName    string `json:"fileName"`
 	FileSize    int64  `json:"fileSize"`
 	Changelog   string `json:"changelog"`
+}
+
+// isAllowedDownloadURL reports whether url is an HTTPS URL whose host is
+// lokalizace.net (or a subdomain of it). The self-updater downloads and
+// executes this binary, so the download source must be tightly pinned.
+func isAllowedDownloadURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "lokalizace.net" || strings.HasSuffix(host, ".lokalizace.net")
 }
 
 // UpdateCheckResponse for the /update-check endpoint
@@ -99,6 +112,19 @@ func checkForUpdate() {
 	downloadURL := versionInfo.DownloadURL
 	if downloadURL != "" && !strings.HasPrefix(downloadURL, "http") {
 		downloadURL = APIBase + downloadURL
+	}
+
+	// Only trust download URLs that point at our own domain over HTTPS. The
+	// agent installs the downloaded binary and runs it, so an attacker-supplied
+	// URL here would mean arbitrary code execution. Reject anything else.
+	if !isAllowedDownloadURL(downloadURL) {
+		fmt.Printf("Rejecting update: download URL %q is not on an allowed host\n", downloadURL)
+		updateMu.Lock()
+		updateAvailable = false
+		latestDownloadURL = ""
+		lastUpdateCheck = time.Now()
+		updateMu.Unlock()
+		return
 	}
 
 	updateMu.Lock()
@@ -167,6 +193,12 @@ func performUpdate() error {
 		isUpdating = false
 		updateMu.Unlock()
 	}()
+
+	// Defense in depth: re-validate the host right before downloading, in case
+	// latestDownloadURL was somehow set without going through checkForUpdate.
+	if !isAllowedDownloadURL(downloadURL) {
+		return fmt.Errorf("refusing to download update from untrusted URL: %s", downloadURL)
+	}
 
 	fmt.Printf("Downloading update from %s...\n", downloadURL)
 

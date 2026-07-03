@@ -190,14 +190,29 @@ function createFocusStore() {
 
   // Globální keyboard handler
   function handleKeydown(event: KeyboardEvent) {
-    // Ignoruj pokud je focus v inputu
+    // Pokud je focus v inputu, nech šipky vlevo/vpravo + Enter/Space nativní
+    // (pohyb kurzoru v textu). ArrowUp/ArrowDown ale pořád navigují - jinak
+    // by uživatel z jednořádkového inputu nemohl šipkou "vyskočit" ven.
     const inInput = event.target instanceof HTMLInputElement ||
                     event.target instanceof HTMLTextAreaElement
-    if (inInput) return
+    if (inInput && event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && event.key !== 'Escape') {
+      return
+    }
 
     const state = get({ subscribe })
     const currentZone = state.activeZone
     const zone = state.zones.get(currentZone)
+
+    // Pokud událost přišla z inputu, focusedIndex nemusí na input ukazovat
+    // (uživatel do něj mohl kliknout myší). Zarovnej index na reálnou pozici
+    // inputu v zóně, aby šipka vyskočila na správný sousední prvek.
+    if (inInput && zone) {
+      const inputIndex = zone.elements.indexOf(event.target as HTMLElement)
+      if (inputIndex !== -1 && inputIndex !== state.focusedIndex) {
+        update(s => ({ ...s, focusedIndex: inputIndex }))
+        state.focusedIndex = inputIndex
+      }
+    }
 
     switch (event.key) {
       case 'ArrowUp':
