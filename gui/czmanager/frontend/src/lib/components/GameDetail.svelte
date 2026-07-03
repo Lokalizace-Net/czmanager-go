@@ -1,16 +1,15 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, WifiOff, Play, Heart } from 'lucide-svelte'
+  import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, Heart } from 'lucide-svelte'
   import type { Localization } from '../stores/games.svelte'
   import { agentStore } from '../stores/agent.svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
   import { favoritesStore } from '../stores/favorites.svelte'
-  import { BrowseFolder, ScanGames, StartAgent, FetchGameDetail, DownloadLocalization } from '../../../wailsjs/go/main/App'
+  import { BrowseFolder, ScanGames, FetchGameDetail, DownloadLocalization, Install, Uninstall, CancelInstall } from '../../../wailsjs/go/main/App'
   import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
 
   const API_BASE = 'https://lokalizace.net'
-  const AGENT_URL = 'http://127.0.0.1:17892'
 
   // Props - Svelte 5
   let { game, onClose }: { game: Localization; onClose?: () => void } = $props()
@@ -27,12 +26,10 @@
   let logs = $state<string[]>([])
   let detectedPath = $state<string | null>(null)
   let scanning = $state(false)
-  let startingAgent = $state(false)
-  let progressInterval: ReturnType<typeof setInterval> | null = null
 
   // Derived state - Svelte 5
+  // Agent runs in-process now; "connected" means the installer is ready.
   let agentConnected = $derived($agentStore.status === 'connected')
-  let agentConnecting = $derived($agentStore.status === 'connecting')
   let safeDescription = $derived(sanitizeHtml(game.description || ''))
   let progressPercent = $derived(game.translatePercent || 0)
   let supportsAppInstall = $derived(game.supportsAppInstall === true)
@@ -123,19 +120,38 @@
     }
   }
 
-  async function getAgentToken(): Promise<string | null> {
-    try {
-      const resp = await fetch(`${AGENT_URL}/ping`)
-      const data = await resp.json()
-      return data.token
-    } catch {
-      return null
-    }
+  // Listen to install/uninstall progress + log events emitted by the Go
+  // backend (replaces the old HTTP polling of /progress and /logs).
+  function startProgressListening() {
+    EventsOn('install:log', (message: string) => {
+      logs = [...logs, message]
+    })
+
+    EventsOn('install:progress', (data: { stage: string; percent: number; error?: string }) => {
+      progress = data.percent || 0
+      progressStage = getStageLabel(data.stage)
+
+      if (data.stage === 'done') {
+        stopProgressListening()
+        installing = false
+        uninstalling = false
+        success = true
+      } else if (data.stage === 'error') {
+        stopProgressListening()
+        installing = false
+        uninstalling = false
+        error = data.error || 'Operace selhala'
+      }
+    })
+  }
+
+  function stopProgressListening() {
+    EventsOff('install:progress')
+    EventsOff('install:log')
   }
 
   async function startInstall() {
     if (!gamePath) { error = 'Vyberte složku s hrou'; return }
-    if (!agentConnected) { error = 'Agent není připojen'; return }
 
     installing = true
     error = null
@@ -158,92 +174,22 @@
       const downloadUrl = `${API_BASE}/api/download/${latestFile.id}`
 
       logs = [...logs, `Stahování: ${latestFile.fileName} (verze ${latestFile.version})`]
-      progressStage = 'Připojování k agentovi...'
-
-      const token = await getAgentToken()
-      if (!token) {
-        throw new Error('Nepodařilo se získat token agenta')
-      }
-
       progressStage = 'Zahajování instalace...'
 
-      const resp = await fetch(`${AGENT_URL}/install`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          game_slug: game.slug,
-          version: latestFile.version || game.version || '1.0.0',
-          download_url: downloadUrl,
-          game_root: gamePath
-        })
-      })
+      // Start listening before the operation so we don't miss early events.
+      startProgressListening()
 
-      const result = await resp.json()
-
-      if (!result.accepted) {
-        throw new Error(result.error || 'Instalace nebyla přijata')
-      }
-
-      startProgressPolling(token)
+      await Install(
+        game.slug,
+        latestFile.version || game.version || '1.0.0',
+        downloadUrl,
+        gamePath
+      )
 
     } catch (err) {
+      stopProgressListening()
       error = err instanceof Error ? err.message : 'Chyba při instalaci'
       installing = false
-    }
-  }
-
-  function startProgressPolling(token: string) {
-    let lastLogIndex = 0
-
-    progressInterval = setInterval(async () => {
-      try {
-        const progressResp = await fetch(`${AGENT_URL}/progress`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const progressData = await progressResp.json()
-
-        progress = progressData.percent || 0
-        progressStage = getStageLabel(progressData.stage)
-
-        if (progressData.error) {
-          error = progressData.error
-        }
-
-        const logsResp = await fetch(`${AGENT_URL}/logs?since=${lastLogIndex}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const logsData = await logsResp.json()
-
-        if (logsData.logs && logsData.logs.length > 0) {
-          const newLogs = logsData.logs.map((l: { message: string }) => l.message)
-          logs = [...logs, ...newLogs]
-          lastLogIndex += logsData.logs.length
-        }
-
-        if (progressData.stage === 'done') {
-          stopProgressPolling()
-          installing = false
-          success = true
-          logs = [...logs, 'Lokalizace byla úspěšně nainstalována!']
-        } else if (progressData.stage === 'error') {
-          stopProgressPolling()
-          installing = false
-          error = progressData.error || 'Instalace selhala'
-        }
-
-      } catch (err) {
-        console.error('Progress polling error:', err)
-      }
-    }, 500)
-  }
-
-  function stopProgressPolling() {
-    if (progressInterval) {
-      clearInterval(progressInterval)
-      progressInterval = null
     }
   }
 
@@ -262,7 +208,6 @@
 
   async function startUninstall() {
     if (!gamePath) { error = 'Chybí cesta ke hře'; return }
-    if (!agentConnected) { error = 'Agent není připojen'; return }
 
     uninstalling = true
     error = null
@@ -271,35 +216,10 @@
     logs = ['Odstraňování lokalizace...']
 
     try {
-      const token = await getAgentToken()
-      if (!token) {
-        throw new Error('Nepodařilo se získat token agenta')
-      }
-
-      const resp = await fetch(`${AGENT_URL}/uninstall`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          game_root: gamePath
-        })
-      })
-
-      const result = await resp.json()
-
-      if (!result.accepted) {
-        throw new Error(result.error || 'Odinstalace nebyla přijata')
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      logs = [...logs, 'Lokalizace byla úspěšně odstraněna.']
-      uninstalling = false
-      success = true
-
+      startProgressListening()
+      await Uninstall(gamePath)
     } catch (err) {
+      stopProgressListening()
       error = err instanceof Error ? err.message : 'Chyba při odinstalaci'
       uninstalling = false
     }
@@ -307,35 +227,17 @@
 
   async function cancelInstall() {
     try {
-      const token = await getAgentToken()
-      if (token) {
-        await fetch(`${AGENT_URL}/cancel`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      }
+      await CancelInstall()
     } catch (err) {
       console.error('Cancel error:', err)
     }
-    stopProgressPolling()
+    stopProgressListening()
     installing = false
     uninstalling = false
   }
 
   function openOnWeb() {
     window.open(`${API_BASE}/localizations/${game.slug}`, '_blank')
-  }
-
-  async function tryStartAgent() {
-    startingAgent = true
-    try {
-      await StartAgent()
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      await agentStore.connect()
-    } catch (err) {
-      console.error('Failed to start agent:', err)
-    }
-    startingAgent = false
   }
 
   async function downloadLocalization() {
@@ -406,7 +308,7 @@
   })
 
   onDestroy(() => {
-    stopProgressPolling()
+    stopProgressListening()
     focusStore.unregisterZone('modal')
   })
 
@@ -493,32 +395,6 @@
 
     <!-- Stav 1: Podporuje přímou instalaci přes aplikaci -->
     {#if supportsAppInstall && isReady}
-      <!-- Kontrola agenta -->
-      {#if !agentConnected}
-        <div class="agent-warning">
-          <div class="agent-warning-icon">
-            <WifiOff size={24} />
-          </div>
-          <div class="agent-warning-content">
-            <h4>Agent není spuštěn</h4>
-            <p>Pro instalaci lokalizací je potřeba mít spuštěného CZManager agenta.</p>
-          </div>
-          <button
-            class="btn-start-agent"
-            onclick={tryStartAgent}
-            disabled={startingAgent || agentConnecting}
-          >
-            {#if startingAgent || agentConnecting}
-              <RefreshCw size={16} class="spinning" />
-              Spouštím...
-            {:else}
-              <Play size={16} />
-              Spustit agenta
-            {/if}
-          </button>
-        </div>
-      {/if}
-
       <div class="input-section">
         <label for="game-path-input">Cesta ke hře</label>
         <div class="input-row">
@@ -1168,58 +1044,4 @@
     outline: none;
     box-shadow: 0 0 0 2px #f97316;
   }
-
-  .agent-warning {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 12px;
-    margin-bottom: 8px;
-  }
-
-  .agent-warning-icon {
-    flex-shrink: 0;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(239, 68, 68, 0.15);
-    border-radius: 12px;
-    color: #f87171;
-  }
-
-  .agent-warning-content { flex: 1; min-width: 0; }
-  .agent-warning-content h4 { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #f87171; }
-  .agent-warning-content p { margin: 0; font-size: 13px; color: rgba(255, 255, 255, 0.5); line-height: 1.4; }
-
-  .btn-start-agent {
-    flex-shrink: 0;
-    height: 40px;
-    padding: 0 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #4ade80;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-start-agent:hover:not(:disabled),
-  .btn-start-agent:focus:not(:disabled) {
-    background: rgba(34, 197, 94, 0.25);
-    border-color: rgba(34, 197, 94, 0.4);
-    outline: none;
-    box-shadow: 0 0 0 2px #f97316;
-  }
-
-  .btn-start-agent:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

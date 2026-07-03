@@ -1,9 +1,8 @@
-package main
+package xdelta
 
 import (
 	"embed"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,14 +11,11 @@ import (
 //go:embed resources/xdelta3.exe resources/xdelta3_linux resources/xdelta3_mac
 var xdeltaFiles embed.FS
 
-//go:embed resources/Favicon.ico
-var faviconICO []byte
-
 var extractedXdeltaPath string
 
-// extractXdelta extracts the appropriate xdelta binary for the current OS
-// Uses a fixed directory to avoid leaving temp files behind on os.Exit
-func extractXdelta() error {
+// Extract extracts the appropriate xdelta binary for the current OS.
+// Uses a fixed directory to avoid leaving temp files behind on os.Exit.
+func Extract() error {
 	var filename string
 	switch runtime.GOOS {
 	case "windows":
@@ -55,8 +51,8 @@ func extractXdelta() error {
 	return nil
 }
 
-// getXdeltaPath returns path to xdelta binary (extracted or local)
-func getXdeltaPath() string {
+// Path returns path to xdelta binary (extracted or local).
+func Path() string {
 	// First check if we have extracted version
 	if extractedXdeltaPath != "" {
 		if _, err := os.Stat(extractedXdeltaPath); err == nil {
@@ -89,28 +85,10 @@ func getXdeltaPath() string {
 	return filename
 }
 
-// cleanupOldXdeltaDirs removes leftover random temp directories from previous versions
-func cleanupOldXdeltaDirs() {
+// CleanupOldDirs removes leftover random temp directories from previous versions.
+func CleanupOldDirs() {
 	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "czmanager-xdelta-*"))
 	for _, dir := range matches {
 		os.RemoveAll(dir)
 	}
-}
-
-// copyEmbeddedFile is a helper to copy embedded file to destination
-func copyEmbeddedFile(srcFS embed.FS, srcPath, dstPath string) error {
-	src, err := srcFS.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
-	dst, err := os.Create(dstPath)
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, src)
-	return err
 }

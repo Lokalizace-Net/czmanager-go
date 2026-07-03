@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import SideMenu from './lib/components/SideMenu.svelte'
-  import AgentBanner from './lib/components/AgentBanner.svelte'
   import WelcomeBanner from './lib/components/WelcomeBanner.svelte'
   import GameGrid from './lib/components/GameGrid.svelte'
   import GameDetail from './lib/components/GameDetail.svelte'
@@ -15,7 +14,7 @@
   import { authStore } from './lib/stores/auth.svelte'
   import { favoritesStore, favoriteLocalizations } from './lib/stores/favorites.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
-  import { StartAgent, FetchGameDetail } from '../wailsjs/go/main/App'
+  import { FetchGameDetail } from '../wailsjs/go/main/App'
   import { Loader2, Search, Terminal, Heart } from 'lucide-svelte'
 
   let selectedGame = $state<Localization | null>(null)
@@ -63,20 +62,8 @@
     // Gamepad Y = toggle favorite
     window.addEventListener('gamepad:favorite', handleGamepadFavorite)
 
-    // Start agent via Wails
-    try {
-      await StartAgent()
-    } catch (err) {
-      console.log('Could not start agent via Wails, may already be running')
-    }
-
-    // Connect to agent
-    let connected = false
-    for (let i = 0; i < 10; i++) {
-      connected = await agentStore.connect()
-      if (connected) break
-      await new Promise(r => setTimeout(r, 1000))
-    }
+    // Agent runs in-process now - just verify the installer is ready.
+    await agentStore.connect()
 
     // Load games
     await gamesStore.fetchLocalizations(true)
@@ -91,7 +78,6 @@
   })
 
   onDestroy(() => {
-    agentStore.stopHealthCheck()
     stopGamepadPolling()
     window.removeEventListener('gamepad:favorite', handleGamepadFavorite)
   })
@@ -338,17 +324,7 @@
         />
       </div>
 
-      <div class="top-bar-right">
-        <div class="agent-indicator" class:connected={$agentStore.status === 'connected'}>
-          <span class="indicator-dot"></span>
-          <span class="indicator-text">
-            {$agentStore.status === 'connected' ? 'Agent připojen' : 'Agent odpojen'}
-          </span>
-        </div>
-      </div>
     </header>
-
-    <AgentBanner />
 
     {#if initializing}
       <div class="loading-container">
@@ -431,7 +407,6 @@
               <div class="settings-card">
                 <h3>O aplikaci</h3>
                 <p>CZManager v3</p>
-                <p>Agent: {$agentStore.version || 'nepřipojen'}</p>
               </div>
 
               <div class="settings-card">
@@ -553,42 +528,6 @@
 
   .search-box input::placeholder {
     color: rgba(255, 255, 255, 0.4);
-  }
-
-  .top-bar-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .agent-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 20px;
-    background: rgba(239, 68, 68, 0.1);
-  }
-
-  .agent-indicator.connected {
-    background: rgba(34, 197, 94, 0.1);
-  }
-
-  .indicator-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ef4444;
-  }
-
-  .agent-indicator.connected .indicator-dot {
-    background: #22c55e;
-  }
-
-  .indicator-text {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.7);
   }
 
   .loading-container {

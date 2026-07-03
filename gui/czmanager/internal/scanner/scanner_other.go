@@ -1,6 +1,6 @@
 //go:build !windows
 
-package main
+package scanner
 
 // getAvailableDrives returns available mount points on non-Windows systems
 func getAvailableDrives() []string {
