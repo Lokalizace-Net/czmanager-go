@@ -1,5 +1,6 @@
-build/czmanager-agent-linux-amd64
-build/czmanager-agent-linux-arm64
-build/czmanager-agent-macos-amd64
-build/czmanager-agent-windows-amd64.exe
+# Build outputs / binaries (not tracked)
+/build/
+/dist/
+gui/czmanager/build/bin/
+*.syso
 nul

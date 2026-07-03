@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import SideMenu from './lib/components/SideMenu.svelte'
-  import AgentBanner from './lib/components/AgentBanner.svelte'
   import WelcomeBanner from './lib/components/WelcomeBanner.svelte'
   import GameGrid from './lib/components/GameGrid.svelte'
   import GameDetail from './lib/components/GameDetail.svelte'
@@ -15,7 +14,7 @@
   import { authStore } from './lib/stores/auth.svelte'
   import { favoritesStore, favoriteLocalizations } from './lib/stores/favorites.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
-  import { StartAgent, FetchGameDetail } from '../wailsjs/go/main/App'
+  import { FetchGameDetail } from '../wailsjs/go/main/App'
   import { Loader2, Search, Terminal, Heart } from 'lucide-svelte'
 
   let selectedGame = $state<Localization | null>(null)
@@ -63,20 +62,8 @@
     // Gamepad Y = toggle favorite
     window.addEventListener('gamepad:favorite', handleGamepadFavorite)
 
-    // Start agent via Wails
-    try {
-      await StartAgent()
-    } catch (err) {
-      console.log('Could not start agent via Wails, may already be running')
-    }
-
-    // Connect to agent
-    let connected = false
-    for (let i = 0; i < 10; i++) {
-      connected = await agentStore.connect()
-      if (connected) break
-      await new Promise(r => setTimeout(r, 1000))
-    }
+    // Agent runs in-process now - just verify the installer is ready.
+    await agentStore.connect()
 
     // Load games
     await gamesStore.fetchLocalizations(true)
@@ -91,7 +78,6 @@
   })
 
   onDestroy(() => {
-    agentStore.stopHealthCheck()
     stopGamepadPolling()
     window.removeEventListener('gamepad:favorite', handleGamepadFavorite)
   })
@@ -347,8 +333,6 @@
         </div>
       </div>
     </header>
-
-    <AgentBanner />
 
     {#if initializing}
       <div class="loading-container">

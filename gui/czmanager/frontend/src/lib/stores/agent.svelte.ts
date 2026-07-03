@@ -1,13 +1,13 @@
-// Agent store - manages connection to the local agent
+// Agent store - the agent now runs in-process inside the GUI (no HTTP, no
+// separate binary), so the connection is effectively always available. This
+// store is kept with the same shape so existing components keep working.
 import { writable, derived, get } from 'svelte/store'
-
-const AGENT_URL = 'http://127.0.0.1:17892'
+import { GetAgentStatus } from '../../../wailsjs/go/main/App'
 
 export type AgentStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 interface AgentState {
   status: AgentStatus
-  token: string | null
   version: string | null
   busy: boolean
   error: string | null
@@ -15,7 +15,6 @@ interface AgentState {
 
 const initialState: AgentState = {
   status: 'disconnected',
-  token: null,
   version: null,
   busy: false,
   error: null
@@ -24,121 +23,49 @@ const initialState: AgentState = {
 function createAgentStore() {
   const { subscribe, set, update } = writable<AgentState>(initialState)
 
-  let pingInterval: ReturnType<typeof setInterval> | null = null
-
+  // connect verifies the in-process installer is ready. Kept async + returning
+  // boolean so existing callers (App.svelte, GameDetail.svelte) are unchanged.
   async function connect(): Promise<boolean> {
     update(s => ({ ...s, status: 'connecting', error: null }))
-
     try {
-      const response = await fetch(`${AGENT_URL}/ping`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+      const status = await GetAgentStatus()
+      if (!status.running) {
+        throw new Error('Installer není připraven')
       }
-
-      const data = await response.json()
       update(s => ({
         ...s,
-        token: data.token,
-        version: data.version,
-        status: 'connected'
+        status: 'connected',
+        version: status.version,
+        busy: status.busy,
+        error: null
       }))
-
-      // Start health check
-      startHealthCheck()
-
       return true
     } catch (err) {
       update(s => ({
         ...s,
         status: 'error',
-        error: err instanceof Error ? err.message : 'Nepodařilo se připojit k agentovi'
+        error: err instanceof Error ? err.message : 'Instalátor není dostupný'
       }))
       return false
     }
   }
 
-  function startHealthCheck() {
-    if (pingInterval) {
-      clearInterval(pingInterval)
+  // refreshStatus updates the busy flag from the backend.
+  async function refreshStatus() {
+    try {
+      const status = await GetAgentStatus()
+      update(s => ({ ...s, busy: status.busy, version: status.version }))
+      return status
+    } catch {
+      return null
     }
-
-    pingInterval = setInterval(async () => {
-      try {
-        const response = await fetch(`${AGENT_URL}/ping`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(3000)
-        })
-
-        if (!response.ok) {
-          throw new Error('Agent not responding')
-        }
-
-        update(s => {
-          if (s.status !== 'connected') {
-            return { ...s, status: 'connected', error: null }
-          }
-          return s
-        })
-      } catch {
-        update(s => ({
-          ...s,
-          status: 'error',
-          error: 'Spojení s agentem bylo přerušeno'
-        }))
-      }
-    }, 10000)
-  }
-
-  function stopHealthCheck() {
-    if (pingInterval) {
-      clearInterval(pingInterval)
-      pingInterval = null
-    }
-  }
-
-  async function fetchWithAuth<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const state = get({ subscribe })
-    if (!state.token) {
-      throw new Error('Not connected to agent')
-    }
-
-    const response = await fetch(`${AGENT_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${state.token}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
-      throw new Error(error.error || `HTTP ${response.status}`)
-    }
-
-    return response.json()
-  }
-
-  async function getStatus() {
-    const data = await fetchWithAuth<{ running: boolean; version: string; busy: boolean }>('/status')
-    update(s => ({
-      ...s,
-      busy: data.busy,
-      version: data.version
-    }))
-    return data
   }
 
   return {
     subscribe,
+    set,
     connect,
-    stopHealthCheck,
-    fetchWithAuth,
-    getStatus
+    refreshStatus
   }
 }
 
@@ -146,4 +73,3 @@ export const agentStore = createAgentStore()
 
 // Derived stores for convenience
 export const isConnected = derived(agentStore, $agent => $agent.status === 'connected')
-export const agentToken = derived(agentStore, $agent => $agent.token)
