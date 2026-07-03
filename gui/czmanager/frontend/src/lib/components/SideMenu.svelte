@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from 'svelte'
   import { Home, Settings, Heart, HelpCircle, Download, LogIn, LogOut, User, Crown } from 'lucide-svelte'
   import { focusStore } from '../stores/focus.svelte'
-  import { agentStore } from '../stores/agent.svelte'
   import { authStore } from '../stores/auth.svelte'
 
   let {
@@ -90,8 +89,6 @@
     // Po kliknutí přejdi na hlavní obsah
     focusStore.setActiveZone('main', false)
   }
-
-  let agentStatus = $derived($agentStore.status)
 </script>
 
 <aside class="side-menu" class:collapsed>
@@ -160,16 +157,6 @@
         {/if}
       </button>
     {/if}
-
-    <!-- Agent status -->
-    <div class="agent-status" class:connected={agentStatus === 'connected'}>
-      <div class="status-dot"></div>
-      {#if !collapsed}
-        <span class="status-text">
-          {agentStatus === 'connected' ? 'Agent připojen' : 'Agent odpojen'}
-        </span>
-      {/if}
-    </div>
 
     <!-- DEBUG - smazat později -->
     {#if !collapsed && user}
@@ -272,42 +259,6 @@
   .menu-footer {
     padding: 16px 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .agent-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    background: rgba(239, 68, 68, 0.1);
-  }
-
-  .agent-status.connected {
-    background: rgba(34, 197, 94, 0.1);
-  }
-
-  .collapsed .agent-status {
-    justify-content: center;
-    padding: 12px;
-  }
-
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ef4444;
-    flex-shrink: 0;
-  }
-
-  .agent-status.connected .status-dot {
-    background: #22c55e;
-  }
-
-  .status-text {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.6);
-    white-space: nowrap;
   }
 
   .user-info {
