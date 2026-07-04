@@ -40,6 +40,8 @@ export function Login(arg1:string,arg2:string):Promise<main.LoginResult>;
 
 export function OpenReleasePage(arg1:string):Promise<void>;
 
+export function PerformUpdate():Promise<void>;
+
 export function RefreshToken(arg1:string):Promise<main.LoginResult>;
 
 export function RemoveFavorite(arg1:string,arg2:number):Promise<Record<string, any>>;
