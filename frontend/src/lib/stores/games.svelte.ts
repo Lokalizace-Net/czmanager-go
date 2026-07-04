@@ -98,14 +98,19 @@ function createGamesStore() {
         }
       }) || []
 
-      update(s => ({
-        ...s,
-        localizations: reset ? newLocalizations : [...s.localizations, ...newLocalizations],
-        hasMore: newLocalizations.length === 100,
-        page: s.page + 1,
-        total: (data.total as number) || newLocalizations.length,
-        loading: false
-      }))
+      update(s => {
+        const merged = reset ? newLocalizations : [...s.localizations, ...newLocalizations]
+        // Naposledy přidané nahoře - vyšší id = novější záznam (auto-increment)
+        const sorted = merged.slice().sort((a, b) => b.id - a.id)
+        return {
+          ...s,
+          localizations: sorted,
+          hasMore: newLocalizations.length === 100,
+          page: s.page + 1,
+          total: (data.total as number) || newLocalizations.length,
+          loading: false
+        }
+      })
     } catch (err) {
       console.error('Failed to fetch localizations:', err)
       update(s => ({

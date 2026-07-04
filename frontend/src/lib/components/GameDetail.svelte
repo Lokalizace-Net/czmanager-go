@@ -422,19 +422,20 @@
         {/if}
       </div>
 
-      <!-- Progress section -->
-      {#if installing || uninstalling}
+      <!-- Progress + logy: zůstávají viditelné i po dokončení/chybě, aby
+           uživatel viděl co se stalo (nakopírované soubory, warningy). -->
+      {#if installing || uninstalling || logs.length > 0}
         <div class="install-progress">
           <div class="install-header">
             <span>{progressStage || (installing ? 'Instalace...' : 'Odinstalace...')}</span>
             <span class="install-percent">{progress}%</span>
           </div>
           <div class="install-track">
-            <div class="install-fill" style="width: {progress}%"></div>
+            <div class="install-fill" class:done={success} class:failed={!!error} style="width: {progress}%"></div>
           </div>
           {#if logs.length > 0}
             <div class="install-logs">
-              {#each logs as log}
+              {#each logs as log, i (i)}
                 <div class="log-line">{log}</div>
               {/each}
             </div>
@@ -875,7 +876,15 @@
     height: 100%;
     background: linear-gradient(90deg, #f97316, #fb923c);
     border-radius: 4px;
-    transition: width 0.3s;
+    transition: width 0.3s, background 0.3s;
+  }
+
+  .install-fill.done {
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+  }
+
+  .install-fill.failed {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
   }
 
   .install-logs {
