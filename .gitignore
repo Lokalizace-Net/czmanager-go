@@ -1,5 +1,5 @@
 # Build outputs / binaries (not tracked)
-/build/
+/build/bin/
 /dist/
 /frontend/node_modules
 /frontend/dist

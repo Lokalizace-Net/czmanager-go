@@ -14,6 +14,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed build/appicon.png
+var icon []byte
+
 // Version je verze aplikace. Vkládá se při buildu přes ldflags:
 //   -ldflags "-X main.Version=v1.6.1"
 // Když se nevloží (např. lokální dev build), zůstane "dev".
@@ -60,6 +63,7 @@ func main() {
 		// Linux specific options
 		Linux: &linux.Options{
 			ProgramName: "CZManager",
+			Icon:        icon,
 		},
 	})
 
