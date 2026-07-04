@@ -13,6 +13,7 @@
   import { focusStore } from './lib/stores/focus.svelte'
   import { authStore } from './lib/stores/auth.svelte'
   import { favoritesStore, favoriteLocalizations } from './lib/stores/favorites.svelte'
+  import { appStore } from './lib/stores/app.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
   import { FetchGameDetail } from '../wailsjs/go/main/App'
   import { Loader2, Search, Terminal, Heart } from 'lucide-svelte'
@@ -56,6 +57,9 @@
   }
 
   onMount(async () => {
+    // Načti verzi aplikace
+    await appStore.init()
+
     // Start gamepad polling
     startGamepadPolling()
 
@@ -406,7 +410,8 @@
             <div class="settings-grid">
               <div class="settings-card">
                 <h3>O aplikaci</h3>
-                <p>CZManager v3</p>
+                <p>CZManager</p>
+                <p>Verze {$appStore.version || '...'}</p>
               </div>
 
               <div class="settings-card">

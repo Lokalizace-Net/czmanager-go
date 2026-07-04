@@ -50,6 +50,10 @@ export function GetLogs() {
   return window['go']['main']['App']['GetLogs']();
 }
 
+export function GetVersion() {
+  return window['go']['main']['App']['GetVersion']();
+}
+
 export function Install(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['Install'](arg1, arg2, arg3, arg4);
 }

@@ -26,6 +26,8 @@ export function GetLogPath():Promise<string>;
 
 export function GetLogs():Promise<Array<string>>;
 
+export function GetVersion():Promise<string>;
+
 export function Install(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function InstallLocal(arg1:string,arg2:string):Promise<void>;

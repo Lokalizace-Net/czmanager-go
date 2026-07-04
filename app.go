@@ -29,6 +29,15 @@ type App struct {
 	logFile   *os.File
 	logs      []string
 	installer *installer.Service
+	version   string
+}
+
+// GetVersion vrací verzi aplikace (vloženou při buildu z git tagu).
+func (a *App) GetVersion() string {
+	if a.version == "" {
+		return "dev"
+	}
+	return a.version
 }
 
 // getLogPath returns path to log file
