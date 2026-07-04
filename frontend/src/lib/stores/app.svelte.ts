@@ -50,6 +50,11 @@ function createAppStore() {
     OpenReleasePage(state.update?.releaseUrl || '')
   }
 
+  // Otevře libovolné URL v systémovém prohlížeči (přes Go backend)
+  function openUrl(url: string) {
+    OpenReleasePage(url)
+  }
+
   // Skryje notifikaci o aktualizaci
   function dismissUpdate() {
     update(s => ({ ...s, dismissed: true }))
@@ -64,6 +69,7 @@ function createAppStore() {
     init,
     checkUpdate,
     openRelease,
+    openUrl,
     dismissUpdate,
     getVersion,
   }

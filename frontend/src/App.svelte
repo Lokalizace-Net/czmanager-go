@@ -17,7 +17,7 @@
   import UpdateNotice from './lib/components/UpdateNotice.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
   import { FetchGameDetail } from '../wailsjs/go/main/App'
-  import { Loader2, Search, Terminal, Heart } from 'lucide-svelte'
+  import { Loader2, Search, Terminal, Heart, ExternalLink, Github, RefreshCw, CheckCircle, Sparkles } from 'lucide-svelte'
 
   let selectedGame = $state<Localization | null>(null)
   let showGameDetail = $state(false)
@@ -28,6 +28,21 @@
   let searchQuery = $state('')
   let searchInput = $state<HTMLInputElement | undefined>(undefined)
   let favGridElement = $state<HTMLElement | undefined>(undefined)
+  let checkingUpdate = $state(false)
+
+  const API_WEB = 'https://lokalizace.net'
+  const GITHUB_URL = 'https://github.com/Lokalizace-Net/czmanager-go'
+
+  // Ruční kontrola aktualizace z Nastavení
+  async function checkForUpdate() {
+    checkingUpdate = true
+    await appStore.checkUpdate()
+    checkingUpdate = false
+  }
+
+  function openExternal(url: string) {
+    appStore.openUrl(url)
+  }
 
   // Registruj focus zónu pro favorites grid když se změní obsah
   $effect(() => {
@@ -412,10 +427,52 @@
             <h1 class="page-title">Nastavení</h1>
 
             <div class="settings-grid">
-              <div class="settings-card">
+              <div class="settings-card about-card">
                 <h3>O aplikaci</h3>
-                <p>CZManager</p>
-                <p>Verze {$appStore.version || '...'}</p>
+
+                <div class="about-head">
+                  <span class="about-name">CZManager</span>
+                  <span class="about-badge">{$appStore.version || '...'}</span>
+                </div>
+                <p class="about-desc">
+                  Instalátor českých lokalizací her. Prohlížení, instalace a správa
+                  lokalizací z <a href={API_WEB} onclick={(e) => { e.preventDefault(); openExternal(API_WEB) }}>Lokalizace.NET</a>.
+                </p>
+
+                <div class="about-rows">
+                  <div class="about-row"><span class="about-key">Verze</span><span class="about-val">{$appStore.version || '...'}</span></div>
+                  <div class="about-row"><span class="about-key">Autor</span><span class="about-val">Lokalizace.NET</span></div>
+                  <div class="about-row"><span class="about-key">Licence</span><span class="about-val">GPL-3.0</span></div>
+                </div>
+
+                <!-- Stav aktualizace -->
+                {#if $appStore.update?.available}
+                  <div class="about-update available">
+                    <Sparkles size={16} />
+                    <span>K dispozici nová verze {$appStore.update.latestVersion}</span>
+                    <button class="about-update-btn" onclick={() => appStore.openRelease()}>Stáhnout</button>
+                  </div>
+                {:else if $appStore.update && !$appStore.update.available}
+                  <div class="about-update ok">
+                    <CheckCircle size={16} />
+                    <span>Máte nejnovější verzi</span>
+                  </div>
+                {/if}
+
+                <div class="about-actions">
+                  <button class="about-btn" onclick={checkForUpdate} disabled={checkingUpdate}>
+                    <RefreshCw size={15} class={checkingUpdate ? 'spinning' : ''} />
+                    {checkingUpdate ? 'Kontroluji...' : 'Zkontrolovat aktualizace'}
+                  </button>
+                  <button class="about-btn" onclick={() => openExternal(GITHUB_URL)}>
+                    <Github size={15} />
+                    GitHub
+                  </button>
+                  <button class="about-btn" onclick={() => openExternal(API_WEB)}>
+                    <ExternalLink size={15} />
+                    Web
+                  </button>
+                </div>
               </div>
 
               <div class="settings-card">
@@ -709,6 +766,144 @@
     font-size: 14px;
     color: rgba(255, 255, 255, 0.5);
     margin: 0 0 8px 0;
+  }
+
+  /* O aplikaci */
+  .about-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .about-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f97316;
+  }
+
+  .about-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  .about-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.6;
+    margin: 0 0 16px 0;
+  }
+
+  .about-desc a {
+    color: #f97316;
+    text-decoration: none;
+  }
+
+  .about-desc a:hover {
+    text-decoration: underline;
+  }
+
+  .about-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .about-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+
+  .about-key {
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .about-val {
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+  }
+
+  .about-update {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  .about-update.available {
+    background: rgba(249, 115, 22, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+    color: #fbbf24;
+  }
+
+  .about-update.ok {
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+  }
+
+  .about-update-btn {
+    margin-left: auto;
+    height: 28px;
+    padding: 0 12px;
+    background: #f97316;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .about-update-btn:hover,
+  .about-update-btn:focus {
+    background: #ea580c;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.4);
+  }
+
+  .about-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .about-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .about-btn:hover:not(:disabled),
+  .about-btn:focus {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    outline: none;
+    box-shadow: 0 0 0 2px #f97316;
+  }
+
+  .about-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .shortcut-list {
