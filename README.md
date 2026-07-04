@@ -180,4 +180,4 @@ Proprietární software. Všechna práva vyhrazena.
 
 ## Autor
 
-**Lokalizace.NET**
+**michalss**

@@ -1,6 +1,7 @@
 # Build outputs / binaries (not tracked)
 /build/
 /dist/
-gui/czmanager/build/bin/
+/frontend/node_modules
+/frontend/dist
 *.syso
 nul

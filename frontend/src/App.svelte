@@ -1,4 +1,4 @@
-<script lang="ts">
+bhoo<script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import SideMenu from './lib/components/SideMenu.svelte'
   import WelcomeBanner from './lib/components/WelcomeBanner.svelte'
