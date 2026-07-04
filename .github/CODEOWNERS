@@ -1,0 +1,9 @@
+# Code owners for CZManager GUI
+#
+# Každý pull request vyžaduje schválení vlastníka (@michalss) předtím,
+# než ho lze mergnout do main. Vyžaduje zapnutou branch protection na main
+# s volbami "Require a pull request before merging", "Require approvals"
+# a "Require review from Code Owners".
+
+# Výchozí vlastník celého repozitáře
+* @michalss
