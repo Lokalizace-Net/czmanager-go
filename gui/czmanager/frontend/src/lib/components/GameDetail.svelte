@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from 'svelte'
   import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, Heart } from 'lucide-svelte'
   import type { Localization } from '../stores/games.svelte'
-  import { agentStore } from '../stores/agent.svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
   import { favoritesStore } from '../stores/favorites.svelte'
@@ -28,8 +27,6 @@
   let scanning = $state(false)
 
   // Derived state - Svelte 5
-  // Agent runs in-process now; "connected" means the installer is ready.
-  let agentConnected = $derived($agentStore.status === 'connected')
   let safeDescription = $derived(sanitizeHtml(game.description || ''))
   let progressPercent = $derived(game.translatePercent || 0)
   let supportsAppInstall = $derived(game.supportsAppInstall === true)
@@ -464,12 +461,12 @@
       {#if !installing && !uninstalling && !downloading}
         <div class="actions">
           {#if game.installedVersion}
-            <button class="btn-danger" onclick={startUninstall} disabled={!gamePath || !agentConnected}>
+            <button class="btn-danger" onclick={startUninstall} disabled={!gamePath}>
               <Trash2 size={18} />
               Odebrat
             </button>
           {/if}
-          <button class="btn-primary" onclick={startInstall} disabled={!gamePath || !agentConnected}>
+          <button class="btn-primary" onclick={startInstall} disabled={!gamePath}>
             <Download size={18} />
             {game.installedVersion ? 'Aktualizovat' : 'Nainstalovat'}
           </button>

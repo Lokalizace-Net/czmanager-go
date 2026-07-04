@@ -8,7 +8,6 @@
   import LoginModal from './lib/components/LoginModal.svelte'
   import LogPanel from './lib/components/LogPanel.svelte'
   import GameCard from './lib/components/GameCard.svelte'
-  import { agentStore } from './lib/stores/agent.svelte'
   import { gamesStore, type Localization } from './lib/stores/games.svelte'
   import { focusStore } from './lib/stores/focus.svelte'
   import { authStore } from './lib/stores/auth.svelte'
@@ -61,9 +60,6 @@
 
     // Gamepad Y = toggle favorite
     window.addEventListener('gamepad:favorite', handleGamepadFavorite)
-
-    // Agent runs in-process now - just verify the installer is ready.
-    await agentStore.connect()
 
     // Load games
     await gamesStore.fetchLocalizations(true)
