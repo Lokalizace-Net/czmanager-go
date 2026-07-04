@@ -23,6 +23,12 @@ import (
 
 const ApiBaseURL = "https://lokalizace.net"
 
+// GitHub repo pro kontrolu aktualizací (public, bez tokenu)
+const (
+	githubOwner = "Lokalizace-Net"
+	githubRepo  = "czmanager-go"
+)
+
 // App struct
 type App struct {
 	ctx       context.Context
@@ -38,6 +44,105 @@ func (a *App) GetVersion() string {
 		return "dev"
 	}
 	return a.version
+}
+
+// UpdateInfo popisuje výsledek kontroly aktualizace.
+type UpdateInfo struct {
+	Available      bool   `json:"available"`      // je k dispozici novější verze?
+	CurrentVersion string `json:"currentVersion"` // aktuální verze aplikace
+	LatestVersion  string `json:"latestVersion"`  // nejnovější verze na GitHubu
+	ReleaseURL     string `json:"releaseUrl"`     // odkaz na release stránku
+	ReleaseNotes   string `json:"releaseNotes"`   // popis vydání
+}
+
+// CheckUpdate zkontroluje nejnovější GitHub Release a porovná s aktuální verzí.
+// Repo je public, takže se nepoužívá žádný token.
+func (a *App) CheckUpdate() (*UpdateInfo, error) {
+	current := a.GetVersion()
+
+	info := &UpdateInfo{
+		Available:      false,
+		CurrentVersion: current,
+	}
+
+	// Dev buildy neaktualizujeme
+	if current == "dev" || strings.HasPrefix(current, "dev-") {
+		return info, nil
+	}
+
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", githubOwner, githubRepo)
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("nepodařilo se spojit s GitHubem: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Žádný release zatím nebyl vydán
+	if resp.StatusCode == http.StatusNotFound {
+		return info, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API vrátilo status %d", resp.StatusCode)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Body    string `json:"body"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("nepodařilo se zpracovat odpověď GitHubu: %v", err)
+	}
+
+	info.LatestVersion = release.TagName
+	info.ReleaseURL = release.HTMLURL
+	info.ReleaseNotes = release.Body
+	info.Available = isNewerVersion(current, release.TagName)
+
+	return info, nil
+}
+
+// isNewerVersion vrací true, pokud je latest novější než current.
+// Verze mají tvar vMAJOR.MINOR.PATCH (např. v1.6.1). Porovnává se numericky
+// po složkách; předpona "v" je volitelná.
+func isNewerVersion(current, latest string) bool {
+	cur := parseVersion(current)
+	lat := parseVersion(latest)
+	for i := 0; i < 3; i++ {
+		if lat[i] > cur[i] {
+			return true
+		}
+		if lat[i] < cur[i] {
+			return false
+		}
+	}
+	return false
+}
+
+// parseVersion rozloží "v1.6.1" na [1, 6, 1]. Chybějící/nečíselné složky = 0.
+func parseVersion(v string) [3]int {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	parts := strings.SplitN(v, ".", 3)
+	var out [3]int
+	for i := 0; i < len(parts) && i < 3; i++ {
+		n := 0
+		fmt.Sscanf(parts[i], "%d", &n)
+		out[i] = n
+	}
+	return out
+}
+
+// OpenReleasePage otevře stránku s vydáním v systémovém prohlížeči.
+func (a *App) OpenReleasePage(url string) {
+	if url == "" {
+		url = fmt.Sprintf("https://github.com/%s/%s/releases/latest", githubOwner, githubRepo)
+	}
+	wailsruntime.BrowserOpenURL(a.ctx, url)
 }
 
 // getLogPath returns path to log file

@@ -18,6 +18,10 @@ export function CancelInstall() {
   return window['go']['main']['App']['CancelInstall']();
 }
 
+export function CheckUpdate() {
+  return window['go']['main']['App']['CheckUpdate']();
+}
+
 export function DownloadLocalization(arg1) {
   return window['go']['main']['App']['DownloadLocalization'](arg1);
 }
@@ -68,6 +72,10 @@ export function IsBusy() {
 
 export function Login(arg1, arg2) {
   return window['go']['main']['App']['Login'](arg1, arg2);
+}
+
+export function OpenReleasePage(arg1) {
+  return window['go']['main']['App']['OpenReleasePage'](arg1);
 }
 
 export function RefreshToken(arg1) {
