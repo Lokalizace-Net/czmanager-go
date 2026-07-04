@@ -13,23 +13,25 @@ echo   - vytvori .flatpak bundle
 echo   - vytvori GitHub Release s vsemi soubory
 echo.
 
-REM Zjisti posledni tag pro info
+REM Zjisti posledni tag a navrhni dalsi patch verzi
+set SUGGESTED=v0.0.1
 for /f "delims=" %%t in ('git describe --tags --abbrev^=0 2^>nul') do set LASTTAG=%%t
 if defined LASTTAG (
   echo Posledni verze: !LASTTAG!
+  REM Rozparsuj vMAJOR.MINOR.PATCH a zvedni PATCH o 1
+  for /f "tokens=1,2,3 delims=." %%a in ("!LASTTAG:v=!") do (
+    set /a NEXTPATCH=%%c+1
+    set SUGGESTED=v%%a.%%b.!NEXTPATCH!
+  )
 ) else (
   echo Zatim zadny tag.
 )
 echo.
 
-set /p VERSION="Zadej novou verzi (napr. v1.6.1): "
+set /p VERSION="Zadej novou verzi [Enter = !SUGGESTED!]: "
 
-if "!VERSION!"=="" (
-  echo.
-  echo CHYBA: Verze nezadana. Koncim.
-  pause
-  exit /b 1
-)
+REM Prazdny vstup = pouzij navrzenou verzi
+if "!VERSION!"=="" set VERSION=!SUGGESTED!
 
 REM Musi zacinat 'v' (workflow reaguje na tagy v*)
 echo !VERSION!| findstr /r "^v[0-9]" >nul
