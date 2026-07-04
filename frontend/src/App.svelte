@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import SideMenu from './lib/components/SideMenu.svelte'
+  import ManualInstall from './lib/components/ManualInstall.svelte'
   import WelcomeBanner from './lib/components/WelcomeBanner.svelte'
   import GameGrid from './lib/components/GameGrid.svelte'
   import GameDetail from './lib/components/GameDetail.svelte'
@@ -394,6 +395,9 @@
             <h1 class="page-title">Stažené</h1>
             <p class="page-empty">Historie stahování bude brzy k dispozici.</p>
           </div>
+
+        {:else if activeMenuItem === 'manual-install'}
+          <ManualInstall />
 
         {:else if activeMenuItem === 'settings'}
           <div class="page-content">

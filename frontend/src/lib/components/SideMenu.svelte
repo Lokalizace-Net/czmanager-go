@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { Home, Settings, Heart, HelpCircle, Download, LogIn, LogOut, User, Crown } from 'lucide-svelte'
+  import { Home, Settings, Heart, HelpCircle, Download, LogIn, LogOut, User, Crown, FlaskConical } from 'lucide-svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
 
@@ -18,14 +18,6 @@
 
   let user = $derived($authStore.user)
   let subscription = $derived($authStore.subscription)
-  let features = $derived($authStore.features)
-
-  // Debug
-  $effect(() => {
-    console.log('SideMenu - user:', user)
-    console.log('SideMenu - subscription:', subscription)
-    console.log('SideMenu - features:', features)
-  })
 
   interface MenuItem {
     id: string
@@ -37,6 +29,7 @@
     { id: 'home', label: 'Domů', icon: Home },
     { id: 'favorites', label: 'Oblíbené', icon: Heart },
     { id: 'downloads', label: 'Stažené', icon: Download },
+    { id: 'manual-install', label: 'Manuální instalace', icon: FlaskConical },
     { id: 'settings', label: 'Nastavení', icon: Settings },
     { id: 'help', label: 'Nápověda', icon: HelpCircle },
   ]
@@ -157,14 +150,6 @@
         {/if}
       </button>
     {/if}
-
-    <!-- DEBUG - smazat později -->
-    {#if !collapsed && user}
-      <div style="font-size: 10px; color: #666; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 4px;">
-        <div>Sub: {subscription?.tier?.slug ?? 'null'}</div>
-        <div>Scanner: {features?.hasGameScanner ? 'ano' : 'ne'}</div>
-      </div>
-    {/if}
   </div>
 </aside>
 
@@ -257,6 +242,8 @@
   }
 
   .menu-footer {
+    display: flex;
+    flex-direction: column;
     padding: 16px 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
   }

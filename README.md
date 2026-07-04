@@ -2,29 +2,30 @@
 
 Multiplatformní desktopová aplikace pro instalaci českých lokalizací her. Postavená na **Wails v2** (Go backend) + **Svelte 5** (frontend) s podporou gamepad a klávesnicové navigace pro Steam Deck.
 
-Komunikuje s webovou aplikací [Lokalizace.NET](https://lokalizace.net) a lokálním HTTP agentem pro správu herních souborů.
+Komunikuje s webovou aplikací [Lokalizace.NET](https://lokalizace.net) a instalaci lokalizačních balíčků provádí přímo v procesu aplikace (žádný samostatný agent na pozadí).
 
-![Go](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go&logoColor=white)
 ![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)
 ![Wails](https://img.shields.io/badge/Wails-v2-412991)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20Steam%20Deck-lightgrey)
+![License](https://img.shields.io/badge/License-GPL_3.0-blue)
 
 ## Funkce
 
-- **Prohlížení lokalizací** — přehledný grid s kartami her, vyhledávání a filtrování
+- **Prohlížení lokalizací** — přehledný grid s kartami her, vyhledávání a filtrování (nejnovější nahoře)
 - **Oblíbené** — možnost přidat hry do oblíbených pro rychlý přístup
 - **Instalace / odinstalace** — stažení a aplikace lokalizačních patchů jedním kliknutím
+- **Manuální instalace** — instalace lokalizačního balíčku z lokálního ZIP archivu (pro tvůrce k testování balíčků před nahráním)
 - **Detekce her** — automatické rozpoznání nainstalovaných her (Steam, Epic Games, GOG, Origin, Ubisoft Connect)
-- **Progress & logy** — real-time progress bar a log výstup během instalace
-- **Gamepad navigace** — plná podpora D-pad, tlačítek a triggerů pro Steam Deck
-- **Klávesnicová navigace** — šipky, Enter, Escape, Ctrl+K pro vyhledávání
-- **Správa agenta** — automatické stažení, spuštění a health-check lokálního agenta
+- **Progress & logy** — real-time progress bar a log výstup během instalace, s perzistentním logem i po dokončení
+- **Gamepad navigace** — podpora D-pad a tlačítek pro Steam Deck
+- **Klávesnicová navigace** — šipky, Enter, Escape, `/` pro vyhledávání
 - **Autentizace** — přihlášení přes Lokalizace.NET účet
 
 ## Prerekvizity
 
-- [Go](https://go.dev/) 1.21+
+- [Go](https://go.dev/) 1.23+
 - [Node.js](https://nodejs.org/) 18+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation) v2
 
@@ -45,8 +46,6 @@ sudo dnf install gtk3-devel webkit2gtk3-devel
 ## Spuštění (vývoj)
 
 ```bash
-cd gui/czmanager
-
 # Instalace frontend závislostí
 cd frontend && npm install && cd ..
 
@@ -57,73 +56,70 @@ wails dev
 ## Build
 
 ```bash
-cd gui/czmanager
-
 # Build pro aktuální platformu
 wails build
 
 # Výstup: build/bin/cz-agent-gui[.exe]
 ```
 
-### Agent (HTTP služba na pozadí)
+Pro dávkový build lze použít pomocné skripty v kořeni repozitáře:
 
 ```bash
-# Build agenta
-go build -ldflags "-s -w" -o build/czmanager-agent .
-
-# Multiplatformní build (Windows)
+# Windows
 build.bat
 
-# Multiplatformní build (Linux/macOS)
-make all
+# Linux / macOS
+./build.sh
 ```
-
-| Target | Příkaz |
-|--------|--------|
-| Windows AMD64 | `make windows-amd64` |
-| Linux AMD64 | `make linux-amd64` |
-| Linux ARM64 (Steam Deck) | `make linux-arm64` |
 
 ## Architektura
 
+Instalace i skenování běží **v procesu** aplikace přes Wails bindings — frontend
+volá Go metody přímo, žádný samostatný HTTP agent už neexistuje. Progress a logy
+se do frontendu streamují přes Wails eventy (`install:progress`, `install:log`).
+
 ```
-┌─────────────────────────────────────┐
-│           CZManager GUI             │
-│  ┌───────────┐  ┌────────────────┐  │
-│  │  Svelte 5 │◄►│  Wails (Go)    │  │
-│  │  Frontend  │  │  Backend       │  │
-│  └───────────┘  └───────┬────────┘  │
-│                         │           │
-└─────────────────────────┼───────────┘
-                          │ HTTP :17892
-┌─────────────────────────▼───────────┐
-│         CZManager Agent             │
-│  • Instalace / odinstalace patchů   │
-│  • Skenování her                    │
-│  • Nativní dialogy                  │
-│  • Self-update                      │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│              CZManager GUI               │
+│  ┌───────────┐      ┌─────────────────┐  │
+│  │ Svelte 5  │◄────►│   Wails (Go)    │  │
+│  │ Frontend  │ Wails│   Backend       │  │
+│  └───────────┘ bind.└────────┬────────┘  │
+│                              │           │
+│                     ┌────────▼────────┐  │
+│                     │ internal/       │  │
+│                     │ • installer     │  │
+│                     │ • scanner       │  │
+│                     │ • xdelta3       │  │
+│                     └─────────────────┘  │
+└───────────────────────────┬──────────────┘
+                            │ HTTPS
+                   ┌────────▼────────┐
+                   │  Lokalizace.NET │
+                   │  (web API)      │
+                   └─────────────────┘
 ```
 
 ### Struktura projektu
 
 ```
 czmanager-gui/
-├── main.go                  # HTTP agent server (:17892)
-├── installer/               # Instalační logika (xdelta3 patching)
-├── scanner.go               # Detekce her z platforem
-├── updater.go               # Self-update agenta
-├── Makefile                 # Multiplatformní build
+├── main.go                  # Vstupní bod Wails aplikace
+├── app.go                   # Go backend (Wails bindings volané z frontendu)
+├── wails.json               # Wails konfigurace
 │
-└── gui/czmanager/           # Wails GUI aplikace
-    ├── app.go               # Go backend (Wails bindings)
-    ├── wails.json           # Wails konfigurace
-    └── frontend/            # Svelte 5 aplikace
-        └── src/
-            ├── App.svelte           # Hlavní komponenta
-            ├── lib/components/      # UI komponenty
-            ├── lib/stores/          # Svelte 5 runes stores
-            └── lib/utils/           # Gamepad, navigace
+├── internal/
+│   ├── installer/           # Instalační logika (ZIP, xdelta3 patching, tasky)
+│   ├── models/              # Datové modely (InstallRequest, instrukce, ...)
+│   ├── scanner/             # Detekce her z herních platforem
+│   └── xdelta/              # Embedded xdelta3 binárky pro patching
+│
+└── frontend/                # Svelte 5 aplikace
+    └── src/
+        ├── App.svelte           # Hlavní komponenta
+        ├── lib/components/      # UI komponenty
+        ├── lib/stores/          # Svelte 5 runes stores
+        └── lib/utils/           # Gamepad, navigace
 ```
 
 ### Technologie
@@ -131,26 +127,11 @@ czmanager-gui/
 | Vrstva | Technologie |
 |--------|------------|
 | Desktop framework | Wails v2 |
-| Backend | Go 1.21 |
+| Backend | Go 1.23 |
 | Frontend | Svelte 5 (runes) + TypeScript |
 | Styling | Tailwind CSS 4 |
 | Ikony | Lucide Svelte |
 | Patching | xdelta3 (embedded) |
-
-## Agent API
-
-Agent běží na `127.0.0.1:17892` s token autentizací.
-
-| Metoda | Endpoint | Popis |
-|--------|----------|-------|
-| `GET` | `/ping` | Health check (veřejný) |
-| `GET` | `/status` | Stav agenta |
-| `POST` | `/install` | Spustit instalaci |
-| `POST` | `/uninstall` | Odinstalovat lokalizaci |
-| `GET` | `/progress` | Průběh instalace |
-| `GET` | `/logs` | Logy instalace |
-| `POST` | `/cancel` | Zrušit operaci |
-| `POST` | `/scan-games` | Detekce nainstalovaných her |
 
 ## Ovládání
 
@@ -161,23 +142,28 @@ Agent běží na `127.0.0.1:17892` s token autentizací.
 | `←↑↓→` | Navigace mezi prvky |
 | `Enter` | Výběr / aktivace |
 | `Escape` | Zpět / zavřít modal |
-| `Ctrl+K` | Vyhledávání |
-| `F5` | Obnovit seznam |
+| `/` | Vyhledávání |
 
 ### Gamepad (Steam Deck)
 
 | Tlačítko | Akce |
 |----------|------|
 | D-pad | Navigace |
-| A / X | Výběr |
-| B / O | Zpět |
-| LB / RB | Přepínání sekcí |
-| LT / RT | Scroll |
+| A | Výběr |
+| B | Zpět |
 
 ## Licence
 
-Proprietární software. Všechna práva vyhrazena.
+Tento projekt je open-source pod licencí **[GNU General Public License v3.0](LICENSE)**.
+
+Copyright © 2026 Lokalizace.NET
+
+Ve zkratce to znamená, že smíte software volně používat, studovat, upravovat
+i šířit (včetně komerčního použití). Pokud ale šíříte upravenou verzi, musíte
+ji uvolnit rovněž pod GPL-3.0 a zpřístupnit její zdrojový kód. Plné znění je
+v souboru [LICENSE](LICENSE), informace o použitých komponentách třetích stran
+(např. xdelta3) v souboru [NOTICE](NOTICE).
 
 ## Autor
 
-**Lokalizace.NET**
+**Lokalizace.NET** (michalss) — [Lokalizace.NET](https://lokalizace.net)
