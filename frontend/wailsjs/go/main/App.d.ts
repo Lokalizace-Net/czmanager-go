@@ -10,6 +10,8 @@ export function BrowseFolder(arg1:string):Promise<string>;
 
 export function CancelInstall():Promise<void>;
 
+export function CheckUpdate():Promise<main.UpdateInfo>;
+
 export function DownloadLocalization(arg1:number):Promise<string>;
 
 export function FetchFavorites(arg1:string):Promise<Record<string, any>>;
@@ -26,6 +28,8 @@ export function GetLogPath():Promise<string>;
 
 export function GetLogs():Promise<Array<string>>;
 
+export function GetVersion():Promise<string>;
+
 export function Install(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function InstallLocal(arg1:string,arg2:string):Promise<void>;
@@ -33,6 +37,8 @@ export function InstallLocal(arg1:string,arg2:string):Promise<void>;
 export function IsBusy():Promise<boolean>;
 
 export function Login(arg1:string,arg2:string):Promise<main.LoginResult>;
+
+export function OpenReleasePage(arg1:string):Promise<void>;
 
 export function RefreshToken(arg1:string):Promise<main.LoginResult>;
 

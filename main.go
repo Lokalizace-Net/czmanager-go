@@ -14,9 +14,18 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed build/appicon.png
+var icon []byte
+
+// Version je verze aplikace. Vkládá se při buildu přes ldflags:
+//   -ldflags "-X main.Version=v1.6.1"
+// Když se nevloží (např. lokální dev build), zůstane "dev".
+var Version = "dev"
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
+	app.version = Version
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -54,6 +63,7 @@ func main() {
 		// Linux specific options
 		Linux: &linux.Options{
 			ProgramName: "CZManager",
+			Icon:        icon,
 		},
 	})
 

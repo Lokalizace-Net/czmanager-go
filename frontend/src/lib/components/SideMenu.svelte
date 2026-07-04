@@ -3,6 +3,7 @@
   import { Home, Settings, Heart, HelpCircle, Download, LogIn, LogOut, User, Crown, FlaskConical } from 'lucide-svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
+  import { appStore } from '../stores/app.svelte'
 
   let {
     activeItem = 'home',
@@ -89,6 +90,9 @@
   <div class="menu-header">
     {#if !collapsed}
       <span class="logo-text">CZManager</span>
+      {#if $appStore.version}
+        <span class="logo-version">{$appStore.version}</span>
+      {/if}
     {:else}
       <span class="logo-text-small">CZ</span>
     {/if}
@@ -177,6 +181,14 @@
     font-size: 20px;
     font-weight: 700;
     color: #f97316;
+  }
+
+  .logo-version {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.35);
   }
 
   .logo-text-small {

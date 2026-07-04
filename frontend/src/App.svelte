@@ -13,6 +13,8 @@
   import { focusStore } from './lib/stores/focus.svelte'
   import { authStore } from './lib/stores/auth.svelte'
   import { favoritesStore, favoriteLocalizations } from './lib/stores/favorites.svelte'
+  import { appStore } from './lib/stores/app.svelte'
+  import UpdateNotice from './lib/components/UpdateNotice.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
   import { FetchGameDetail } from '../wailsjs/go/main/App'
   import { Loader2, Search, Terminal, Heart } from 'lucide-svelte'
@@ -56,6 +58,12 @@
   }
 
   onMount(async () => {
+    // Načti verzi aplikace
+    await appStore.init()
+
+    // Zkontroluj aktualizaci na GitHubu (na pozadí, tichá chyba)
+    appStore.checkUpdate()
+
     // Start gamepad polling
     startGamepadPolling()
 
@@ -406,7 +414,8 @@
             <div class="settings-grid">
               <div class="settings-card">
                 <h3>O aplikaci</h3>
-                <p>CZManager v3</p>
+                <p>CZManager</p>
+                <p>Verze {$appStore.version || '...'}</p>
               </div>
 
               <div class="settings-card">
@@ -463,6 +472,9 @@
     open={showLoginModal}
     onClose={() => showLoginModal = false}
   />
+
+  <!-- Notifikace o aktualizaci (z GitHubu) -->
+  <UpdateNotice />
 
   <!-- Log Panel Toggle -->
   <button class="log-toggle" onclick={() => showLogPanel = !showLogPanel} title="Debug Log">

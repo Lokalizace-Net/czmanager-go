@@ -9,5 +9,12 @@
   "author": {
     "name": "Lokalizace.NET",
     "email": "info@lokalizace.net"
+  },
+  "info": {
+    "companyName": "Lokalizace.NET",
+    "productName": "CZManager",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026 Lokalizace.NET",
+    "comments": "Instalátor českých lokalizací her"
   }
 }
