@@ -166,4 +166,4 @@ v souboru [LICENSE](LICENSE), informace o použitých komponentách třetích st
 
 ## Autor
 
-**Lokalizace.NET** (michalss) — [Lokalizace.NET](https://lokalizace.net)
+**michalss** — [Lokalizace.NET](https://lokalizace.net)
