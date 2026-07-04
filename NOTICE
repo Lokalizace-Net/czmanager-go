@@ -1,0 +1,29 @@
+CZManager GUI
+Copyright (C) 2026 Lokalizace.NET
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option)
+any later version. See the LICENSE file for the full license text.
+
+--------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------
+
+This application bundles prebuilt binaries of xdelta3, used for applying
+binary delta patches during localization installation:
+
+    internal/xdelta/resources/xdelta3.exe    (Windows)
+    internal/xdelta/resources/xdelta3_linux  (Linux)
+    internal/xdelta/resources/xdelta3_mac    (macOS)
+
+xdelta3 is Copyright (C) Joshua MacDonald and contributors, and is
+distributed under the terms of the Apache License, Version 2.0 (which is
+compatible with the GNU GPL version 3). See:
+
+    https://github.com/jmacd/xdelta
+    https://www.apache.org/licenses/LICENSE-2.0
+
+The remaining source code of this project depends on open-source libraries
+(Wails, Svelte, and others), each governed by its own license as declared
+in go.mod and frontend/package.json.
