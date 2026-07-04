@@ -223,30 +223,18 @@ function createAuthStore() {
     }
 
     try {
-      console.log('Fetching subscription with token:', state.accessToken?.substring(0, 20) + '...')
       const data = await FetchSubscription(state.accessToken)
-      console.log('Subscription API response:', JSON.stringify(data, null, 2))
-      console.log('Features from API:', data.features)
-      console.log('hasGameScanner from API:', data.features?.hasGameScanner)
 
       // Ošetři prázdný objekt subscription
       const sub = data.subscription && Object.keys(data.subscription).length > 0
         ? data.subscription as Subscription
         : null
 
-      update(s => {
-        console.log('Updating store with features:', data.features)
-        return {
-          ...s,
-          features: data.features as SubscriptionFeatures,
-          subscription: sub
-        }
-      })
-
-      // Ověř co je v store po update
-      const newState = get({ subscribe })
-      console.log('Store after update - features:', newState.features)
-      console.log('Store after update - hasGameScanner:', newState.features?.hasGameScanner)
+      update(s => ({
+        ...s,
+        features: data.features as SubscriptionFeatures,
+        subscription: sub
+      }))
     } catch (e) {
       console.error('Failed to fetch subscription:', e)
     }
