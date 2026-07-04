@@ -39,14 +39,22 @@
   onMount(() => {
     loadLogs()
 
+    // Obecné aplikační logy
     EventsOn('log', (line: string) => {
       logs = [...logs, line]
+      scrollToBottom()
+    })
+
+    // Logy z instalace/odinstalace - označíme prefixem, ať jsou poznat
+    EventsOn('install:log', (message: string) => {
+      logs = [...logs, `[INSTALL] ${message}`]
       scrollToBottom()
     })
   })
 
   onDestroy(() => {
     EventsOff('log')
+    EventsOff('install:log')
   })
 </script>
 
@@ -64,8 +72,13 @@
   </div>
 
   <div class="log-content" bind:this={logContainer}>
-    {#each logs as log}
-      <div class="log-line" class:error={log.includes('ERROR')} class:agent={log.includes('[Agent')}>
+    {#each logs as log, i (i)}
+      <div
+        class="log-line"
+        class:error={log.includes('ERROR')}
+        class:agent={log.includes('[Agent')}
+        class:install={log.startsWith('[INSTALL]')}
+      >
         {log}
       </div>
     {/each}
@@ -148,6 +161,11 @@
     word-break: break-all;
   }
 
+  .log-line.install {
+    color: #fbbf24;
+  }
+
+  /* Error má přednost před ostatními barvami */
   .log-line.error {
     color: #f87171;
   }
