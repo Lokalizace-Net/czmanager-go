@@ -156,6 +156,32 @@ func (a *App) Install(gameSlug, version, downloadURL, gameRoot string) error {
 	return nil
 }
 
+// InstallLocal installs a localization from a local ZIP archive instead of
+// downloading it. Used by the "Manual install" tab so creators can test their
+// packages before uploading them. Progress/logs stream via the same events.
+func (a *App) InstallLocal(gameRoot, zipPath string) error {
+	if a.installer == nil {
+		return fmt.Errorf("installer not ready")
+	}
+	if zipPath == "" {
+		return fmt.Errorf("nebyl vybrán žádný archiv")
+	}
+	if gameRoot == "" {
+		return fmt.Errorf("nebyla vybrána složka s hrou")
+	}
+	req := models.InstallRequest{
+		GameSlug: "manual",
+		Version:  "manual",
+		GameRoot: gameRoot,
+		LocalZip: zipPath,
+	}
+	if err := a.installer.Install(req); err != nil {
+		return err
+	}
+	go a.streamProgress()
+	return nil
+}
+
 // Uninstall removes a previously installed localization from gameRoot.
 func (a *App) Uninstall(gameRoot string) error {
 	if a.installer == nil {

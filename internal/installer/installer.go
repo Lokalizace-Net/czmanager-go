@@ -167,6 +167,13 @@ func (s *Service) doInstall(req models.InstallRequest) {
 	s.logInfo(fmt.Sprintf("Zahajuji instalaci %s v%s", req.GameSlug, req.Version))
 	s.logInfo(fmt.Sprintf("Cílová složka: %s", req.GameRoot))
 
+	// Manuální instalace z lokálního ZIPu - přeskočí stahování z API
+	if req.LocalZip != "" {
+		s.logInfo(fmt.Sprintf("Manuální instalace z lokálního archivu: %s", req.LocalZip))
+		s.doInstallFromZip(req, req.LocalZip)
+		return
+	}
+
 	// Zjistíme download URL z API pokud není zadané
 	downloadURL := req.DownloadURL
 	if downloadURL == "" && req.GameID > 0 {
@@ -216,7 +223,7 @@ func (s *Service) doInstall(req models.InstallRequest) {
 		return
 	}
 
-	// Extract
+	// Extract a pak proveď instalaci ze společné logiky
 	s.setProgress(models.StageExtracting, 30, "Rozbalování archivu...")
 	s.logInfo("Rozbaluji archiv...")
 
@@ -226,6 +233,45 @@ func (s *Service) doInstall(req models.InstallRequest) {
 		return
 	}
 
+	s.runInstallSteps(req, extractPath)
+}
+
+// doInstallFromZip runs the install from a local ZIP file (manual install for
+// creators testing their packages). It skips the download stage and extracts
+// the given archive directly, then reuses the shared install logic.
+func (s *Service) doInstallFromZip(req models.InstallRequest, zipPath string) {
+	if _, err := os.Stat(zipPath); err != nil {
+		s.setError(fmt.Sprintf("Archiv nenalezen: %v", err))
+		s.logError(err.Error())
+		return
+	}
+
+	tempDir, err := os.MkdirTemp("", "czmanager-*")
+	if err != nil {
+		s.setError(fmt.Sprintf("Nepodařilo se vytvořit dočasnou složku: %v", err))
+		s.logError(err.Error())
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	extractPath := filepath.Join(tempDir, "extracted")
+
+	s.setProgress(models.StageExtracting, 30, "Rozbalování archivu...")
+	s.logInfo("Rozbaluji lokální archiv...")
+
+	if err := s.extractZip(zipPath, extractPath); err != nil {
+		s.setError(fmt.Sprintf("Rozbalení selhalo: %v", err))
+		s.logError(err.Error())
+		return
+	}
+
+	s.runInstallSteps(req, extractPath)
+}
+
+// runInstallSteps performs the extraction-independent part of the install:
+// load instructions, run pre-tasks, install modd files, run post-tasks.
+// Shared by both the download-based install and the local-ZIP manual install.
+func (s *Service) runInstallSteps(req models.InstallRequest, extractPath string) {
 	if s.isCancelled() {
 		s.setError("Operace byla zrušena")
 		return
