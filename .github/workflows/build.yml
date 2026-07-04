@@ -2,12 +2,9 @@ name: Build & Release
 
 on:
   push:
-    branches: [main]
     tags:
-      - 'v*'
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+      - 'v*'          # release.bat pushne tag vX.Y.Z -> spustí build & release
+  workflow_dispatch:  # ruční spuštění tlačítkem v záložce Actions
 
 jobs:
   build:
