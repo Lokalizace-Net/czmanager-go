@@ -374,13 +374,6 @@ func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, err
 	req, _ := http.NewRequest("GET", ApiBaseURL+"/api/subscription", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	// DEBUG
-	tokenLen := len(accessToken)
-	if tokenLen > 50 {
-		tokenLen = 50
-	}
-	fmt.Printf("FetchSubscription - token length: %d, first chars: %s\n", len(accessToken), accessToken[:tokenLen])
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("chyba připojení k serveru")
@@ -396,15 +389,10 @@ func (a *App) FetchSubscription(accessToken string) (map[string]interface{}, err
 		return nil, fmt.Errorf("chyba čtení odpovědi")
 	}
 
-	// DEBUG - loguj surovou odpověď
-	fmt.Printf("Subscription API raw response: %s\n", string(body))
-
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("chyba parsování odpovědi")
 	}
-
-	fmt.Printf("Subscription API parsed: %+v\n", result)
 
 	return result, nil
 }
