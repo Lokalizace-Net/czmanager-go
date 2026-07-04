@@ -21,10 +21,7 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const (
-	AgentVersion = "latest"
-	ApiBaseURL   = "https://lokalizace.net"
-)
+const ApiBaseURL = "https://lokalizace.net"
 
 // App struct
 type App struct {
@@ -134,23 +131,6 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 // --- Installer bindings (in-process, replaces the former HTTP agent) ---
-
-// AgentStatus mirrors the old /status response so the frontend keeps a
-// stable shape. The agent is always "running" now because it is in-process.
-type AgentStatus struct {
-	Running bool   `json:"running"`
-	Version string `json:"version"`
-	Busy    bool   `json:"busy"`
-}
-
-// GetAgentStatus reports installer availability. Kept for frontend compat.
-func (a *App) GetAgentStatus() AgentStatus {
-	return AgentStatus{
-		Running: a.installer != nil,
-		Version: AgentVersion,
-		Busy:    a.installer != nil && a.installer.IsBusy(),
-	}
-}
 
 // IsBusy reports whether an install/uninstall is currently running.
 func (a *App) IsBusy() bool {

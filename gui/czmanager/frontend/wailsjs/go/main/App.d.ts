@@ -20,8 +20,6 @@ export function FetchGames(arg1:number,arg2:number,arg3:string):Promise<Record<s
 
 export function FetchSubscription(arg1:string):Promise<Record<string, any>>;
 
-export function GetAgentStatus():Promise<main.AgentStatus>;
-
 export function GetImageBase64(arg1:string):Promise<string>;
 
 export function GetLogPath():Promise<string>;
