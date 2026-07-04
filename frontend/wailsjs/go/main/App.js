@@ -78,6 +78,10 @@ export function OpenReleasePage(arg1) {
   return window['go']['main']['App']['OpenReleasePage'](arg1);
 }
 
+export function PerformUpdate() {
+  return window['go']['main']['App']['PerformUpdate']();
+}
+
 export function RefreshToken(arg1) {
   return window['go']['main']['App']['RefreshToken'](arg1);
 }

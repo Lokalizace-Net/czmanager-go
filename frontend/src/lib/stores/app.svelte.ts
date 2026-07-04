@@ -1,6 +1,7 @@
 // App store - informace o aplikaci (verze + auto-update z GitHubu)
 import { writable, get } from 'svelte/store'
-import { GetVersion, CheckUpdate, OpenReleasePage } from '../../../wailsjs/go/main/App'
+import { GetVersion, CheckUpdate, OpenReleasePage, PerformUpdate } from '../../../wailsjs/go/main/App'
+import { EventsOn } from '../../../wailsjs/runtime/runtime'
 
 export interface UpdateInfo {
   available: boolean
@@ -10,10 +11,19 @@ export interface UpdateInfo {
   releaseNotes: string
 }
 
+export interface UpdateProgress {
+  stage: string    // downloading | installing | restarting | error
+  percent: number
+  message: string
+}
+
 interface AppState {
   version: string
-  update: UpdateInfo | null   // null = ještě nezkontrolováno
-  dismissed: boolean          // uživatel zavřel notifikaci
+  update: UpdateInfo | null       // null = ještě nezkontrolováno
+  dismissed: boolean              // uživatel zavřel notifikaci
+  updating: boolean               // probíhá self-update
+  progress: UpdateProgress | null // průběh self-update
+  updateError: string | null      // chyba self-update
 }
 
 function createAppStore() {
@@ -21,6 +31,19 @@ function createAppStore() {
     version: '',
     update: null,
     dismissed: false,
+    updating: false,
+    progress: null,
+    updateError: null,
+  })
+
+  // Poslouchej průběh self-update z Go backendu
+  EventsOn('update:progress', (p: UpdateProgress) => {
+    update(s => ({
+      ...s,
+      progress: p,
+      updateError: p.stage === 'error' ? p.message : s.updateError,
+      updating: p.stage !== 'error',
+    }))
   })
 
   // Načte verzi z Go backendu (vloženou při buildu z git tagu)
@@ -55,6 +78,19 @@ function createAppStore() {
     OpenReleasePage(url)
   }
 
+  // Spustí automatickou aktualizaci (stáhne + nahradí + restartuje).
+  // Při selhání nastaví updateError; volající pak může nabídnout ruční stažení.
+  async function performUpdate() {
+    update(s => ({ ...s, updating: true, updateError: null, progress: { stage: 'downloading', percent: 0, message: 'Zahajuji...' } }))
+    try {
+      await PerformUpdate()
+      // Pokud vše proběhne, aplikace se restartuje - sem se většinou nedostaneme
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      update(s => ({ ...s, updating: false, updateError: msg }))
+    }
+  }
+
   // Skryje notifikaci o aktualizaci
   function dismissUpdate() {
     update(s => ({ ...s, dismissed: true }))
@@ -70,6 +106,7 @@ function createAppStore() {
     checkUpdate,
     openRelease,
     openUrl,
+    performUpdate,
     dismissUpdate,
     getVersion,
   }

@@ -224,6 +224,14 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.initLogging()
 
+	// Úklid po případném self-update: smaž starou binárku (.old)
+	if exe, err := os.Executable(); err == nil {
+		if exe, err := filepath.EvalSymlinks(exe); err == nil {
+			os.Remove(exe + ".old")
+			os.Remove(exe + ".new")
+		}
+	}
+
 	// Prepare the embedded xdelta3 binary and the installer service. The
 	// installer runs in-process now - there is no separate agent binary.
 	xdelta.CleanupOldDirs()

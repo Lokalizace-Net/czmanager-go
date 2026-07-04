@@ -450,7 +450,9 @@
                   <div class="about-update available">
                     <Sparkles size={16} />
                     <span>K dispozici nová verze {$appStore.update.latestVersion}</span>
-                    <button class="about-update-btn" onclick={() => appStore.openRelease()}>Stáhnout</button>
+                    <button class="about-update-btn" onclick={() => appStore.performUpdate()} disabled={$appStore.updating}>
+                      {$appStore.updating ? 'Aktualizuji...' : 'Aktualizovat'}
+                    </button>
                   </div>
                 {:else if $appStore.update && !$appStore.update.available}
                   <div class="about-update ok">
