@@ -13,7 +13,7 @@
   import { focusStore } from './lib/stores/focus.svelte'
   import { authStore } from './lib/stores/auth.svelte'
   import { favoritesStore, favoriteLocalizations } from './lib/stores/favorites.svelte'
-  import { appStore } from './lib/stores/app.svelte'
+  import { appStore, debugLog } from './lib/stores/app.svelte'
   import UpdateNotice from './lib/components/UpdateNotice.svelte'
   import { startGamepadPolling, stopGamepadPolling } from './lib/utils/gamepad'
   import { FetchGameDetail } from '../wailsjs/go/main/App'
@@ -75,6 +75,7 @@
   onMount(async () => {
     // Načti verzi aplikace
     await appStore.init()
+    debugLog(`Aplikace spuštěna (verze ${appStore.getVersion()})`)
 
     // Zkontroluj aktualizaci na GitHubu (na pozadí, tichá chyba)
     appStore.checkUpdate()
@@ -103,6 +104,7 @@
   })
 
   function handleGameSelect(game: Localization) {
+    debugLog(`Otevřen detail hry: ${game.name}`)
     selectedGame = game
     showGameDetail = true
     focusStore.setActiveZone('modal')
@@ -168,6 +170,7 @@
   }
 
   function handleMenuNavigate(item: string) {
+    debugLog(`Navigace: ${item}`)
     activeMenuItem = item
     focusStore.setActiveZone('main')
   }
