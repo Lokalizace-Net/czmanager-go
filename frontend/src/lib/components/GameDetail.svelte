@@ -6,7 +6,7 @@
   import { authStore } from '../stores/auth.svelte'
   import { favoritesStore } from '../stores/favorites.svelte'
   import { BrowseFolder, ScanGames, FetchGameDetail, DownloadLocalization, Install, Uninstall, CancelInstall } from '../../../wailsjs/go/main/App'
-  import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
+  import { EventsOn, EventsOff, BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 
   const API_BASE = 'https://lokalizace.net'
 
@@ -234,7 +234,8 @@
   }
 
   function openOnWeb() {
-    window.open(`${API_BASE}/localizations/${game.slug}`, '_blank')
+    // Otevři v systémovém prohlížeči (ne uvnitř webview)
+    BrowserOpenURL(`${API_BASE}/localizations/${game.slug}`)
   }
 
   async function downloadLocalization() {

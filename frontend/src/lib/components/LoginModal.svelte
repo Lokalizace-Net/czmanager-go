@@ -2,6 +2,7 @@
   import { X, User, Lock, Loader2, AlertCircle, Crown, Heart } from 'lucide-svelte'
   import { authStore } from '../stores/auth.svelte'
   import { favoritesStore } from '../stores/favorites.svelte'
+  import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 
   let {
     open = false,
@@ -127,7 +128,7 @@
       <!-- Content -->
       <div class="modal-content">
         <p class="login-info">
-          Přihlaš se svým účtem z <a href="https://lokalizace.net" target="_blank">lokalizace.net</a>
+          Přihlaš se svým účtem z <a href="https://lokalizace.net" onclick={(e) => { e.preventDefault(); BrowserOpenURL('https://lokalizace.net') }}>lokalizace.net</a>
         </p>
 
         {#if error}
@@ -204,7 +205,7 @@
         </div>
 
         <p class="register-hint">
-          Nemáš účet? <a href="https://lokalizace.net/register" target="_blank">Zaregistruj se</a>
+          Nemáš účet? <a href="https://lokalizace.net/register" onclick={(e) => { e.preventDefault(); BrowserOpenURL('https://lokalizace.net/register') }}>Zaregistruj se</a>
         </p>
       </div>
     </div>
