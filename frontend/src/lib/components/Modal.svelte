@@ -53,17 +53,20 @@
     bottom: 0;
     z-index: 50;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
-    padding: 40px 10%;
+    padding: 24px clamp(16px, 8%, 160px);
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
   }
 
   .modal-content {
     width: 100%;
-    height: 100%;
-    overflow-y: auto;
+    /* Vejde se i na malé displeje - výška podle obsahu, max do výšky okna,
+       a scrolluje se uvnitř když je obsah vyšší. */
+    max-height: calc(100vh - 48px);
+    display: flex;
+    overflow: hidden;
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     animation: fade-in 0.2s ease-out, zoom-in 0.2s ease-out;
