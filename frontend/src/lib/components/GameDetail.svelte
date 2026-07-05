@@ -746,7 +746,7 @@
     flex-direction: column;
     gap: 24px;
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
     min-height: 0;
   }
 
@@ -754,9 +754,6 @@
     font-size: 14px;
     color: rgba(255, 255, 255, 0.6);
     line-height: 1.6;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
     padding-right: 8px;
   }
 
