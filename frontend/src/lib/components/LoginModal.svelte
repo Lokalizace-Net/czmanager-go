@@ -44,6 +44,11 @@
       // Načti oblíbené z API po přihlášení
       favoritesStore.fetchFromApi()
       onClose?.()
+    } else {
+      // Login selhal: submit tlačítko bylo během isLoading disabled a ztratilo
+      // focus. Vrať focus do modalu (na heslo), ať fokus neuteče "pod" modal
+      // a uživatel mohl rovnou opravit údaje.
+      setTimeout(() => passwordInput?.focus(), 50)
     }
   }
 
