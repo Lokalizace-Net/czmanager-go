@@ -571,9 +571,10 @@
   .modal-card {
     background: #1a1a1a;
     border-radius: 16px;
-    overflow: hidden;
     width: 100%;
-    height: 100%;
+    max-height: 100%;
+    /* Celý card scrolluje - na malém okně se nic neuřízne (header i obsah) */
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
   }
@@ -581,6 +582,7 @@
   .modal-header {
     position: relative;
     padding: 32px 40px;
+    flex-shrink: 0;
   }
 
   .close-btn {
@@ -758,8 +760,6 @@
     flex-direction: column;
     gap: 24px;
     flex: 1;
-    overflow-y: auto;
-    min-height: 0;
   }
 
   .description {
