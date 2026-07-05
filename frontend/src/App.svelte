@@ -193,6 +193,11 @@
 
   // Hlavní keyboard handler pro navigaci
   function handleGlobalKeydown(e: KeyboardEvent) {
+    // Když je otevřený login modal, nech ovládání jen jemu (má vlastní handler).
+    // Jinak by po ztrátě fokusu (např. po chybě přihlášení) šipky ovládaly
+    // grid "pod" modalem.
+    if (showLoginModal) return
+
     const inSearch = e.target === searchInput
     const inInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
 
