@@ -5,7 +5,7 @@
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
   import { favoritesStore } from '../stores/favorites.svelte'
-  import { BrowseFolder, ScanGames, FetchGameDetail, DownloadLocalization, Install, Uninstall, CancelInstall } from '../../../wailsjs/go/main/App'
+  import { BrowseFolder, ScanGames, FetchGameDetail, DownloadLocalization, Install, Uninstall, CancelInstall, IsInstalled } from '../../../wailsjs/go/main/App'
   import { EventsOn, EventsOff, BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 
   const API_BASE = 'https://lokalizace.net'
@@ -25,6 +25,14 @@
   let logs = $state<string[]>([])
   let detectedPath = $state<string | null>(null)
   let scanning = $state(false)
+  let isInstalled = $state(false)  // je lokalizace nainstalovaná v gamePath?
+
+  // Zkontroluj instalaci pokaždé, když se změní cesta ke hře
+  $effect(() => {
+    const path = gamePath
+    if (!path) { isInstalled = false; return }
+    IsInstalled(path).then(v => { isInstalled = v }).catch(() => { isInstalled = false })
+  })
 
   // Derived state - Svelte 5
   let safeDescription = $derived(sanitizeHtml(game.description || ''))
@@ -133,6 +141,10 @@
         installing = false
         uninstalling = false
         success = true
+        // Po instalaci/odinstalaci přepočítej stav (ukáže/skryje "Odebrat")
+        if (gamePath) {
+          IsInstalled(gamePath).then(v => { isInstalled = v }).catch(() => {})
+        }
       } else if (data.stage === 'error') {
         stopProgressListening()
         installing = false
@@ -462,7 +474,7 @@
       <!-- Action buttons -->
       {#if !installing && !uninstalling && !downloading}
         <div class="actions">
-          {#if game.installedVersion}
+          {#if isInstalled}
             <button class="btn-danger" onclick={startUninstall} disabled={!gamePath}>
               <Trash2 size={18} />
               Odebrat
@@ -470,7 +482,7 @@
           {/if}
           <button class="btn-primary" onclick={startInstall} disabled={!gamePath}>
             <Download size={18} />
-            {game.installedVersion ? 'Aktualizovat' : 'Nainstalovat'}
+            {isInstalled ? 'Přeinstalovat' : 'Nainstalovat'}
           </button>
           <button class="btn-secondary" onclick={downloadLocalization} disabled={downloading}>
             <Download size={18} />

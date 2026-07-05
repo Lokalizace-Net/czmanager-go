@@ -271,6 +271,12 @@ func (a *App) IsBusy() bool {
 	return a.installer != nil && a.installer.IsBusy()
 }
 
+// IsInstalled reports whether a localization is installed in the given folder
+// (detected via .ORIG/.IMPORT backup files left by the installer).
+func (a *App) IsInstalled(gameRoot string) bool {
+	return a.installer != nil && a.installer.IsInstalled(gameRoot)
+}
+
 // Install starts a localization install and streams progress/logs to the
 // frontend via the "install:progress" and "install:log" events.
 func (a *App) Install(gameSlug, version, downloadURL, gameRoot string) error {

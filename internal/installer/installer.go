@@ -49,6 +49,26 @@ func (s *Service) IsBusy() bool {
 	return s.isBusy
 }
 
+// IsInstalled zjistí, zda je v dané složce nainstalovaná lokalizace - podle
+// přítomnosti záložních souborů (.ORIG / .IMPORT), které installer zanechává.
+func (s *Service) IsInstalled(gameRoot string) bool {
+	if gameRoot == "" {
+		return false
+	}
+	found := false
+	filepath.Walk(gameRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".ORIG") || strings.HasSuffix(path, ".IMPORT") {
+			found = true
+			return filepath.SkipAll // stačí první nález
+		}
+		return nil
+	})
+	return found
+}
+
 // GetProgress returns the current progress
 func (s *Service) GetProgress() models.ProgressResponse {
 	s.mu.Lock()
