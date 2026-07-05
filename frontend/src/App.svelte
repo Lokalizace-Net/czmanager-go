@@ -135,7 +135,9 @@
       const availability = item.availability || 'web_only'
 
       const fullGame: Localization = {
-        id: item.id,
+        // Zachovej původní id z oblíbených, ať sedí s favoritesStore.ids
+        // (detekce "je v oblíbených" v GameDetail se řídí tímto id)
+        id: favGame.id,
         slug: item.slug,
         name: item.name,
         description: item.story || '',

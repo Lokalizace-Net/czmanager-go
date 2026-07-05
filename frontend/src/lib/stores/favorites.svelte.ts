@@ -57,17 +57,14 @@ function createFavoritesStore() {
   // Načtení oblíbených z API
   async function fetchFromApi() {
     const auth = get(authStore)
-    console.log('[FAV] fetchFromApi called, hasToken:', !!auth.accessToken)
     if (!auth.accessToken) return
 
     update(s => ({ ...s, loading: true }))
 
     try {
       const data = await FetchFavorites(auth.accessToken)
-      console.log('[FAV] API response:', JSON.stringify(data))
       const favorites = (data.favorites as FavoriteGame[]) || []
       const ids = favorites.map(f => f.id)
-      console.log('[FAV] Parsed favorites:', favorites.length, 'ids:', ids)
 
       update(s => ({
         ...s,
