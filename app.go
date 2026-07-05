@@ -777,7 +777,7 @@ func (a *App) AddFavorite(accessToken string, gameId int) (map[string]interface{
 	}
 
 	if resp.StatusCode == 403 {
-		return nil, fmt.Errorf("%s", string(body))
+		return nil, fmt.Errorf("%s", extractErrorMessage(body, "Dosáhli jste limitu oblíbených her"))
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -790,6 +790,21 @@ func (a *App) AddFavorite(accessToken string, gameId int) (map[string]interface{
 	}
 
 	return result, nil
+}
+
+// extractErrorMessage vytáhne čitelnou chybovou hlášku z odpovědi API.
+// Podporuje JSON {"error":"..."} / {"message":"..."}. Pokud odpověď není
+// JSON (např. HTML error stránka), vrátí zadaný fallback místo surového těla.
+func extractErrorMessage(body []byte, fallback string) string {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(body, &parsed); err == nil {
+		for _, key := range []string{"error", "message", "detail"} {
+			if v, ok := parsed[key].(string); ok && v != "" {
+				return v
+			}
+		}
+	}
+	return fallback
 }
 
 // RemoveFavorite removes a game from favorites via DELETE /api/favorites
