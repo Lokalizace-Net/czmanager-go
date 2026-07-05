@@ -58,10 +58,6 @@ export function GetVersion() {
   return window['go']['main']['App']['GetVersion']();
 }
 
-export function Log(arg1) {
-  return window['go']['main']['App']['Log'](arg1);
-}
-
 export function Install(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['Install'](arg1, arg2, arg3, arg4);
 }
@@ -72,6 +68,14 @@ export function InstallLocal(arg1, arg2) {
 
 export function IsBusy() {
   return window['go']['main']['App']['IsBusy']();
+}
+
+export function IsInstalled(arg1) {
+  return window['go']['main']['App']['IsInstalled'](arg1);
+}
+
+export function Log(arg1) {
+  return window['go']['main']['App']['Log'](arg1);
 }
 
 export function Login(arg1, arg2) {
