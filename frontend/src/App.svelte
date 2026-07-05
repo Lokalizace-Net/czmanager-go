@@ -513,7 +513,7 @@
                 <li>Nastavte cestu ke hře</li>
                 <li>Klikněte na "Nainstalovat"</li>
               </ol>
-              <p>Pokud máte problémy, navštivte <a href="https://lokalizace.net" target="_blank">lokalizace.net</a></p>
+              <p>Pokud máte problémy, navštivte <a href="https://lokalizace.net" onclick={(e) => { e.preventDefault(); openExternal('https://lokalizace.net') }}>lokalizace.net</a></p>
             </div>
           </div>
         {/if}

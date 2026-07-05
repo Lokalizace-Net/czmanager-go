@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from './Button.svelte'
   import { Heart } from 'lucide-svelte'
+  import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
 </script>
 
 <div class="welcome-wrapper">
@@ -16,7 +17,7 @@
       <Button
         variant="primary"
         class="support-btn"
-        onclick={() => window.open('https://lokalizace.net/support', '_blank')}
+        onclick={() => BrowserOpenURL('https://lokalizace.net/support')}
       >
         <Heart size={16} />
         Podpořit projekt
