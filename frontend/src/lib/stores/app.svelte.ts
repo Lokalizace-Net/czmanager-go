@@ -1,7 +1,13 @@
 // App store - informace o aplikaci (verze + auto-update z GitHubu)
 import { writable, get } from 'svelte/store'
-import { GetVersion, CheckUpdate, OpenReleasePage, PerformUpdate } from '../../../wailsjs/go/main/App'
+import { GetVersion, CheckUpdate, OpenReleasePage, PerformUpdate, Log } from '../../../wailsjs/go/main/App'
 import { EventsOn } from '../../../wailsjs/runtime/runtime'
+
+// log zapíše zprávu do Debug Logu (přes Go backend). Používá se pro logování
+// uživatelských akcí z frontendu (navigace, kliknutí, ...).
+export function debugLog(message: string) {
+  Log(message).catch(() => {})
+}
 
 export interface UpdateInfo {
   available: boolean

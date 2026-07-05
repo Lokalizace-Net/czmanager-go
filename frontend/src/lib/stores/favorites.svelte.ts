@@ -2,6 +2,7 @@
 import { writable, derived, get } from 'svelte/store'
 import { type Localization } from './games.svelte'
 import { authStore } from './auth.svelte'
+import { debugLog } from './app.svelte'
 // @ts-ignore - bindings se generují dynamicky
 import { FetchFavorites, AddFavorite, RemoveFavorite } from '../../../wailsjs/go/main/App'
 
@@ -93,11 +94,13 @@ function createFavoritesStore() {
     const wasFavorite = state.ids.includes(gameId)
 
     if (wasFavorite) {
+      debugLog(`Odebráno z oblíbených (hra #${gameId})`)
       const newIds = state.ids.filter(id => id !== gameId)
       const newGames = state.games.filter(g => g.id !== gameId)
       update(s => ({ ...s, ids: newIds, games: newGames, limitError: null }))
       saveCacheToStorage(newIds)
     } else {
+      debugLog(`Přidáno do oblíbených (hra #${gameId})`)
       const newIds = [...state.ids, gameId]
       update(s => ({ ...s, ids: newIds, limitError: null }))
       saveCacheToStorage(newIds)

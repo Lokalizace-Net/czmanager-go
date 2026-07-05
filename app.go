@@ -104,6 +104,12 @@ func (a *App) CheckUpdate() (*UpdateInfo, error) {
 	info.ReleaseNotes = release.Body
 	info.Available = isNewerVersion(current, release.TagName)
 
+	if info.Available {
+		a.log("Kontrola aktualizace: k dispozici nová verze %s (aktuální %s)", release.TagName, current)
+	} else {
+		a.log("Kontrola aktualizace: máte nejnovější verzi (%s)", current)
+	}
+
 	return info, nil
 }
 
@@ -199,6 +205,12 @@ func (a *App) log(format string, args ...interface{}) {
 // GetLogs returns recent logs
 func (a *App) GetLogs() []string {
 	return a.logs
+}
+
+// Log zapíše zprávu z frontendu do Debug Logu (stejný kanál jako backend logy).
+// Frontend tak může logovat uživatelské akce (navigace, kliknutí, ...).
+func (a *App) Log(message string) {
+	a.log("%s", message)
 }
 
 // GetLogPath returns the log file path
@@ -354,6 +366,12 @@ func (a *App) streamProgress() {
 
 // ScanGames scans for installed games matching the name (in-process).
 func (a *App) ScanGames(gameName string) ([]DetectedGame, error) {
+	if gameName != "" {
+		a.log("Hledám nainstalovanou hru: %s", gameName)
+	} else {
+		a.log("Skenuji nainstalované hry...")
+	}
+
 	var found []scanner.InstalledGame
 	if gameName != "" {
 		found = scanner.FindGameByName(gameName)
@@ -370,6 +388,7 @@ func (a *App) ScanGames(gameName string) ([]DetectedGame, error) {
 			AppID:    g.AppID,
 		})
 	}
+	a.log("Sken dokončen: nalezeno %d her", len(games))
 	return games, nil
 }
 
@@ -429,11 +448,13 @@ type LoginResult struct {
 
 // Login authenticates user with lokalizace.net API
 func (a *App) Login(username string, password string) (*LoginResult, error) {
+	a.log("Přihlašování uživatele: %s", username)
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	reqBody := fmt.Sprintf(`{"username": "%s", "password": "%s"}`, username, password)
 	resp, err := client.Post(ApiBaseURL+"/api/auth/login", "application/json", strings.NewReader(reqBody))
 	if err != nil {
+		a.log("Přihlášení selhalo: chyba připojení k serveru")
 		return nil, fmt.Errorf("chyba připojení k serveru")
 	}
 	defer resp.Body.Close()
@@ -444,12 +465,15 @@ func (a *App) Login(username string, password string) (*LoginResult, error) {
 	}
 
 	if resp.StatusCode == 401 {
+		a.log("Přihlášení selhalo: neplatné přihlašovací údaje")
 		return nil, fmt.Errorf("neplatné přihlašovací údaje")
 	}
 	if resp.StatusCode == 403 {
+		a.log("Přihlášení selhalo: účet je zablokován")
 		return nil, fmt.Errorf("účet je zablokován")
 	}
 	if resp.StatusCode != http.StatusOK {
+		a.log("Přihlášení selhalo: server vrátil status %d", resp.StatusCode)
 		return nil, fmt.Errorf("chyba serveru: %d", resp.StatusCode)
 	}
 
@@ -458,6 +482,7 @@ func (a *App) Login(username string, password string) (*LoginResult, error) {
 		return nil, fmt.Errorf("chyba parsování odpovědi")
 	}
 
+	a.log("Uživatel %s úspěšně přihlášen", username)
 	return &result, nil
 }
 
@@ -530,8 +555,15 @@ func (a *App) FetchGames(page int, limit int, search string) (map[string]interfa
 		apiUrl += "&search=" + encoded
 	}
 
+	if search != "" {
+		a.log("Načítám lokalizace (stránka %d, hledání: %q)", page, search)
+	} else {
+		a.log("Načítám lokalizace (stránka %d)", page)
+	}
+
 	resp, err := client.Get(apiUrl)
 	if err != nil {
+		a.log("Načtení lokalizací selhalo: %v", err)
 		return nil, fmt.Errorf("failed to fetch games: %v", err)
 	}
 	defer resp.Body.Close()
@@ -544,6 +576,10 @@ func (a *App) FetchGames(page int, limit int, search string) (map[string]interfa
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %v", err)
+	}
+
+	if games, ok := result["games"].([]interface{}); ok {
+		a.log("Načteno %d lokalizací", len(games))
 	}
 
 	return result, nil
