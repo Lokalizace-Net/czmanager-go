@@ -77,13 +77,15 @@ function createFocusStore() {
     const state = get({ subscribe })
     const zone = state.zones.get(state.activeZone)
 
-    // Pokud jsme v modalu, zavři ho
-    if (state.activeZone === 'modal' && zone?.onEscape) {
+    // Pokud má aktivní zóna definovaný onEscape (modal, main stránka s vlastním
+    // handlerem, ...), zavolej ho. Pokrývá i návrat z 'main' do sidemenu na
+    // stránkách jako Manuální instalace.
+    if (zone?.onEscape) {
       zone.onEscape()
       return true
     }
 
-    // Z menu nebo gridu se vrať na hlavní grid
+    // Z menu se vrať na hlavní grid
     if (state.activeZone === 'sidemenu') {
       setActiveZone('main', false)
       return true
