@@ -111,18 +111,20 @@ jobs:
           EOF
           chmod +x "$APPDIR/AppRun"
 
-          # Stáhni linuxdeploy + GTK plugin (zabalí webkit knihovny dovnitř)
-          LD_ARCH=$ARCH
-          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${LD_ARCH}.AppImage" -O linuxdeploy
-          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk.sh" -O linuxdeploy-plugin-gtk.sh
-          chmod +x linuxdeploy linuxdeploy-plugin-gtk.sh
+          # Stáhni linuxdeploy (AppImage) + GTK plugin. Plugin musí být v PATH
+          # pojmenovaný přesně "linuxdeploy-plugin-gtk" (bez .sh), aby ho
+          # linuxdeploy s --plugin gtk našel.
+          wget "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${ARCH}.AppImage" -O linuxdeploy
+          wget "https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh" -O linuxdeploy-plugin-gtk
+          chmod +x linuxdeploy linuxdeploy-plugin-gtk
 
-          # AppImage nejde spustit přes FUSE v CI - extrahuj a spusť
+          # AppImage nejde spustit přes FUSE v CI - extrahuj a spusť z rozbaleného
           ./linuxdeploy --appimage-extract >/dev/null
           export PATH="$PWD:$PATH"
 
           # Sestav AppImage (GTK plugin dotáhne webkit2gtk + závislosti)
-          OUTPUT=${{ matrix.appimage }} ./squashfs-root/AppRun \
+          export OUTPUT=${{ matrix.appimage }}
+          ./squashfs-root/AppRun \
             --appdir "$APPDIR" \
             --plugin gtk \
             --output appimage
