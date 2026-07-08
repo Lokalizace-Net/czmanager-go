@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import { FileArchive, FolderOpen, Play, CheckCircle, AlertCircle, FlaskConical } from 'lucide-svelte'
   import { BrowseFile, BrowseFolder, InstallLocal, CancelInstall } from '../../../wailsjs/go/main/App'
-  import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
+  import { EventsOn, EventsOff, OnFileDrop, OnFileDropOff } from '../../../wailsjs/runtime/runtime'
   import { focusStore } from '../stores/focus.svelte'
 
   // State - Svelte 5 runes
@@ -14,6 +14,7 @@
   let error = $state<string | null>(null)
   let success = $state(false)
   let logs = $state<string[]>([])
+  let dragOver = $state(false)  // přetahuje se soubor nad drop zónou?
 
   let canInstall = $derived(!!zipPath && !!gamePath && !installing)
 
@@ -55,6 +56,20 @@
 
   onMount(() => {
     setTimeout(updateFocusElements, 100)
+
+    // Drag & drop ZIPu (Wails OnFileDrop vrací skutečné cesty souborů)
+    OnFileDrop((_x, _y, paths) => {
+      dragOver = false
+      if (installing) return
+      const zip = paths.find(p => p.toLowerCase().endsWith('.zip'))
+      if (zip) {
+        zipPath = zip
+        error = null
+        success = false
+      } else if (paths.length > 0) {
+        error = 'Přetáhněte prosím ZIP archiv (.zip)'
+      }
+    }, false)
   })
 
   function getStageLabel(stage: string): string {
@@ -154,6 +169,7 @@
 
   onDestroy(() => {
     stopProgressListening()
+    OnFileDropOff()
     // Ukliď po sobě, ať v 'main' zóně nezůstanou odpojené prvky
     focusStore.updateZoneElements('main', [])
   })
@@ -189,6 +205,20 @@
           <FileArchive size={16} />
           <span>Procházet</span>
         </button>
+      </div>
+
+      <!-- Drop zóna: přetáhni ZIP sem (skutečnou cestu dodá Wails OnFileDrop) -->
+      <div
+        class="drop-zone"
+        class:over={dragOver}
+        role="region"
+        aria-label="Přetáhněte sem ZIP archiv"
+        ondragover={(e) => { e.preventDefault(); if (!installing) dragOver = true }}
+        ondragleave={() => dragOver = false}
+        ondrop={(e) => { e.preventDefault(); dragOver = false }}
+      >
+        <FileArchive size={20} />
+        <span>{dragOver ? 'Pusťte ZIP archiv zde' : 'Nebo sem přetáhněte ZIP archiv'}</span>
       </div>
     </div>
 
@@ -317,6 +347,26 @@
   .input-row {
     display: flex;
     gap: 8px;
+  }
+
+  .drop-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 16px;
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+
+  .drop-zone.over {
+    border-color: #f97316;
+    background: rgba(249, 115, 22, 0.08);
+    color: #f97316;
   }
 
   .input-wrapper {
