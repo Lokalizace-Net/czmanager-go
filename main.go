@@ -43,6 +43,10 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
+		// Drag & drop souborů (Manuální instalace - přetažení ZIPu)
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
+		},
 		// Windows specific options
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
