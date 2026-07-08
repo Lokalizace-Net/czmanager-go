@@ -222,6 +222,7 @@
     error = null
     success = false
     progress = 0
+    progressStage = 'Odinstalace...'
     logs = ['Odstraňování lokalizace...']
 
     try {
@@ -255,6 +256,7 @@
     error = null
     success = false
     progress = 0
+    progressStage = 'Stahování...'
     logs = ['Připojování k serveru...']
 
     // Posloucháme progress eventy
@@ -437,10 +439,10 @@
 
       <!-- Progress + logy: zůstávají viditelné i po dokončení/chybě, aby
            uživatel viděl co se stalo (nakopírované soubory, warningy). -->
-      {#if installing || uninstalling || logs.length > 0}
+      {#if installing || uninstalling || downloading || logs.length > 0}
         <div class="install-progress">
           <div class="install-header">
-            <span>{progressStage || (installing ? 'Instalace...' : 'Odinstalace...')}</span>
+            <span>{progressStage || (installing ? 'Instalace...' : uninstalling ? 'Odinstalace...' : downloading ? 'Stahování...' : 'Zpracování...')}</span>
             <span class="install-percent">{progress}%</span>
           </div>
           <div class="install-track">
