@@ -347,25 +347,43 @@ func (a *App) CancelInstall() {
 // replaces the old HTTP polling the frontend did against /progress and /logs.
 func (a *App) streamProgress() {
 	sentLogs := 0
-	for {
-		// Flush any new log lines first so the UI stays in sync.
+
+	// flushLogs pošle všechny dosud nevydané log řádky do UI.
+	flushLogs := func() {
 		newLogs := a.installer.GetLogs(sentLogs)
 		for _, entry := range newLogs {
 			wailsruntime.EventsEmit(a.ctx, "install:log", entry.Message)
 		}
 		sentLogs += len(newLogs)
+	}
+
+	for {
+		flushLogs()
 
 		progress := a.installer.GetProgress()
-		wailsruntime.EventsEmit(a.ctx, "install:progress", progress)
+		terminal := progress.Stage == models.StageDone || progress.Stage == models.StageError
 
-		if progress.Stage == models.StageDone || progress.Stage == models.StageError {
+		// Terminální stav hlásíme AŽ když installer skutečně doběhl (není busy).
+		// Tím se vyhneme "napíše dokončeno, ale proces ještě běží" - done se
+		// pošle, teprve když je operace opravdu u konce.
+		if terminal && !a.installer.IsBusy() {
+			flushLogs() // poslední log řádky ať se neztratí
+			wailsruntime.EventsEmit(a.ctx, "install:progress", progress)
 			return
 		}
+
+		// Safety net: operace skončila bez terminálního stavu.
 		if !a.installer.IsBusy() {
-			// Safety net: operation ended without a terminal stage.
+			flushLogs()
 			wailsruntime.EventsEmit(a.ctx, "install:progress", a.installer.GetProgress())
 			return
 		}
+
+		// Průběžný progress (ne terminální dokud běží)
+		if !terminal {
+			wailsruntime.EventsEmit(a.ctx, "install:progress", progress)
+		}
+
 		time.Sleep(300 * time.Millisecond)
 	}
 }
