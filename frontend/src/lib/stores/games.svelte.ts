@@ -41,6 +41,11 @@ interface GamesState {
 
 const API_BASE = 'https://lokalizace.net'
 
+// Počet lokalizací na stránku. POZOR: API vrací HTTP 500 při limitu >= 90
+// (server neustojí větší dávku), proto držíme bezpečnou hodnotu s rezervou.
+// Zbytek se donačítá stránkováním (scroll / tlačítko "Načíst další").
+const PAGE_SIZE = 50
+
 function createGamesStore() {
   const { subscribe, set, update } = writable<GamesState>({
     localizations: [],
@@ -66,7 +71,7 @@ function createGamesStore() {
       const currentState = get({ subscribe })
 
       // Use Wails backend to fetch games (avoids CORS)
-      const data = await FetchGames(currentState.page, 100, currentState.searchQuery)
+      const data = await FetchGames(currentState.page, PAGE_SIZE, currentState.searchQuery)
 
       const newLocalizations: Localization[] = (data.games as any[])?.map((item: any) => {
         const status = mapStatus(item.status)
@@ -106,7 +111,7 @@ function createGamesStore() {
         return {
           ...s,
           localizations: sorted,
-          hasMore: newLocalizations.length === 100,
+          hasMore: newLocalizations.length === PAGE_SIZE,
           page: s.page + 1,
           total: (data.total as number) || newLocalizations.length,
           loading: false
