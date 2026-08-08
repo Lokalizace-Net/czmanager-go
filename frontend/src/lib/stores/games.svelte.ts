@@ -1,6 +1,7 @@
 // Games store - manages localization data from Lokalizace.NET
 import { writable, derived, get } from 'svelte/store'
 import { FetchGames } from '../../../wailsjs/go/main/App'
+import { debugLog } from './app.svelte'
 
 export type LocalizationStatus = 'translating' | 'released' | 'beta' | 'wip' | 'draft'
 
@@ -112,23 +113,17 @@ function createGamesStore() {
         }
       })
     } catch (err) {
+      // Chybu ukaž uživateli - dřív se místo ní tiše načetla mock data
+      // (Gothic, Legacy of Kain...), což vypadalo, že "nejsou projekty".
+      const msg = err instanceof Error ? err.message : String(err)
       console.error('Failed to fetch localizations:', err)
+      debugLog(`Načtení lokalizací selhalo: ${msg}`)
       update(s => ({
         ...s,
-        error: err instanceof Error ? err.message : 'Nepodařilo se načíst lokalizace',
+        error: `Nepodařilo se načíst lokalizace: ${msg}`,
+        hasMore: false,
         loading: false
       }))
-
-      // Fallback: load mock data for development
-      const currentState = get({ subscribe })
-      if (currentState.localizations.length === 0) {
-        update(s => ({
-          ...s,
-          localizations: getMockData(),
-          hasMore: false,
-          error: null
-        }))
-      }
     }
   }
 
@@ -160,104 +155,6 @@ function createGamesStore() {
     setSearchQuery,
     getLocalizationBySlug
   }
-}
-
-// Mock data for development - fallback when API is not available
-function getMockData(): Localization[] {
-  const BASE = 'https://lokalizace.net'
-  return [
-    {
-      id: 1,
-      slug: 'gothic-ii-gold-edition',
-      name: 'Gothic II: Gold Edition',
-      description: 'RPG klasika s českým dabingem od Piranha Bytes',
-      imageUrl: `${BASE}/uploads/games/gothic-ii-gold-edition/thumbnail.webp`,
-      status: 'released',
-      version: '3.0.0',
-      teamName: 'Lokalizace.NET',
-      translatePercent: 100,
-      correctionPercent: 100,
-      testingPercent: 100
-    },
-    {
-      id: 2,
-      slug: 'legacy-of-kain-defiance',
-      name: 'Legacy of Kain: Defiance',
-      description: 'Akční adventura z temného světa Legacy of Kain',
-      imageUrl: `${BASE}/uploads/games/legacy-of-kain-defiance/thumbnail.webp`,
-      status: 'translating',
-      version: '2.1.0',
-      teamName: 'Lokalizace.NET',
-      translatePercent: 75,
-      correctionPercent: 50,
-      testingPercent: 20
-    },
-    {
-      id: 3,
-      slug: 'julia-among-the-stars',
-      name: 'J.U.L.I.A.: Among the Stars',
-      description: 'Sci-fi adventura od českého studia CBE software',
-      imageUrl: `${BASE}/uploads/games/julia-among-the-stars/thumbnail.webp`,
-      status: 'released',
-      version: '1.5.0',
-      teamName: 'CBE Software',
-      translatePercent: 100,
-      correctionPercent: 100,
-      testingPercent: 100
-    },
-    {
-      id: 4,
-      slug: 'metal-gear-solid-master-collection-vol-1',
-      name: 'Metal Gear Solid: Master Collection',
-      description: 'Legendární stealth série od Hideo Kojimy',
-      imageUrl: `${BASE}/uploads/games/metal-gear-solid-master-collection-vol-1/thumbnail.webp`,
-      status: 'beta',
-      version: '0.9.0',
-      teamName: 'Lokalizace.NET',
-      translatePercent: 90,
-      correctionPercent: 70,
-      testingPercent: 40
-    },
-    {
-      id: 5,
-      slug: 'gothic',
-      name: 'Gothic',
-      description: 'První díl kultovní RPG série',
-      imageUrl: `${BASE}/uploads/games/gothic/thumbnail.webp`,
-      status: 'released',
-      version: '2.0.0',
-      teamName: 'Lokalizace.NET',
-      translatePercent: 100,
-      correctionPercent: 100,
-      testingPercent: 100
-    },
-    {
-      id: 6,
-      slug: 'soul-reaver',
-      name: 'Legacy of Kain: Soul Reaver',
-      description: 'Akční adventura s Razielem',
-      imageUrl: `${BASE}/uploads/games/soul-reaver/thumbnail.webp`,
-      status: 'translating',
-      version: '1.0.0',
-      teamName: 'Lokalizace.NET',
-      translatePercent: 60,
-      correctionPercent: 30,
-      testingPercent: 10
-    },
-    {
-      id: 7,
-      slug: 'soul-reaver-2',
-      name: 'Legacy of Kain: Soul Reaver 2',
-      description: 'Pokračování příběhu Raziela',
-      imageUrl: `${BASE}/uploads/games/soul-reaver-2/thumbnail.webp`,
-      status: 'wip',
-      version: '0.5.0',
-      teamName: 'Lokalizace.NET',
-      translatePercent: 20,
-      correctionPercent: 5,
-      testingPercent: 0
-    }
-  ]
 }
 
 export const gamesStore = createGamesStore()

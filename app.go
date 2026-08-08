@@ -585,21 +585,29 @@ func (a *App) FetchGames(page int, limit int, search string) (map[string]interfa
 		a.log("Načítám lokalizace (stránka %d)", page)
 	}
 
-	resp, err := client.Get(apiUrl)
+	req, _ := http.NewRequest("GET", apiUrl, nil)
+	req.Header.Set("User-Agent", "CZManager/"+a.GetVersion())
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		a.log("Načtení lokalizací selhalo: %v", err)
-		return nil, fmt.Errorf("failed to fetch games: %v", err)
+		return nil, fmt.Errorf("nepodařilo se spojit se serverem: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
+		return nil, fmt.Errorf("chyba čtení odpovědi: %v", err)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %v", err)
+		// Server nevrátil JSON (typicky HTML chybová stránka, proxy/captive
+		// portal nebo výpadek). Zaloguj detail, ať jde příčina dohledat.
+		a.log("Server nevrátil JSON. HTTP status: %d, Content-Type: %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+		a.log("Začátek odpovědi: %s", firstChars(body, 300))
+		return nil, fmt.Errorf("server vrátil neplatnou odpověď (HTTP %d) - zkontrolujte připojení k internetu", resp.StatusCode)
 	}
 
 	if games, ok := result["games"].([]interface{}); ok {
@@ -607,6 +615,15 @@ func (a *App) FetchGames(page int, limit int, search string) (map[string]interfa
 	}
 
 	return result, nil
+}
+
+// firstChars vrátí prvních n znaků (pro diagnostiku odpovědi v logu).
+func firstChars(b []byte, n int) string {
+	s := strings.TrimSpace(string(b))
+	if len(s) > n {
+		return s[:n] + "..."
+	}
+	return s
 }
 
 // FetchGameDetail fetches game detail including files from lokalizace.net API

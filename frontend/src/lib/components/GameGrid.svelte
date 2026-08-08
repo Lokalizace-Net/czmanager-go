@@ -167,9 +167,18 @@
 
 {#if $filteredLocalizations.length === 0 && !$gamesStore.loading}
   <div class="empty-state">
-    <p class="empty-title">Žádné lokalizace nenalezeny</p>
-    {#if $gamesStore.searchQuery}
-      <p class="empty-hint">Zkuste upravit vyhledávání</p>
+    {#if $gamesStore.error}
+      <!-- Chyba načtení - ukaž důvod, ať uživatel neháda proč nejsou projekty -->
+      <p class="empty-title error">{$gamesStore.error}</p>
+      <p class="empty-hint">Zkontrolujte připojení k internetu a zkuste to znovu.</p>
+      <button class="load-more-btn retry-btn" onclick={() => gamesStore.fetchLocalizations(true)}>
+        Zkusit znovu
+      </button>
+    {:else}
+      <p class="empty-title">Žádné lokalizace nenalezeny</p>
+      {#if $gamesStore.searchQuery}
+        <p class="empty-hint">Zkuste upravit vyhledávání</p>
+      {/if}
     {/if}
   </div>
 {/if}
@@ -258,5 +267,15 @@
     font-size: 14px;
     color: rgba(255, 255, 255, 0.3);
     margin: 8px 0 0 0;
+  }
+
+  .empty-title.error {
+    color: #f87171;
+    max-width: 640px;
+    text-align: center;
+  }
+
+  .retry-btn {
+    margin-top: 20px;
   }
 </style>
