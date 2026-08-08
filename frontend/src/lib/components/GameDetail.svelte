@@ -324,11 +324,19 @@
     focusStore.unregisterZone('modal')
   })
 
-  // Aktualizuj focusables když se změní stav
+  // Aktualizuj focusables když se změní cokoli, co mění vykreslená tlačítka.
+  // Důležité: gamePath a isInstalled ovlivňují disabled stav i počet tlačítek
+  // (Odebrat/Přeinstalovat) - bez nich zůstala zóna bez nich a šipky na ně
+  // nedosáhly (tlačítka byla při první registraci ještě disabled).
   $effect(() => {
-    if (installing || uninstalling || downloading || success || error) {
-      setTimeout(updateFocusables, 50)
-    }
+    void installing
+    void uninstalling
+    void downloading
+    void success
+    void error
+    void gamePath
+    void isInstalled
+    setTimeout(updateFocusables, 50)
   })
 </script>
 
