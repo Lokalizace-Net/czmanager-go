@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
-  import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, Heart } from 'lucide-svelte'
+  import { FolderOpen, Download, Trash2, RefreshCw, CheckCircle, AlertCircle, X, ExternalLink, Clock, AlertTriangle, Heart, Crown } from 'lucide-svelte'
   import type { Localization } from '../stores/games.svelte'
   import { focusStore } from '../stores/focus.svelte'
   import { authStore } from '../stores/auth.svelte'
@@ -26,6 +26,87 @@
   let detectedPath = $state<string | null>(null)
   let scanning = $state(false)
   let isInstalled = $state(false)  // je lokalizace nainstalovaná v gamePath?
+
+  // Verze překladu (soubory z API)
+  interface GameFile {
+    id: number
+    version: string
+    fileName: string
+    fileSize: number | null
+    installType: string
+    vipOnly: boolean
+    downloads: number
+    createdAt: string
+  }
+
+  let files = $state<GameFile[]>([])
+  let selectedFileId = $state<number | null>(null)
+  let loadingFiles = $state(false)
+
+  // Nárok na VIP-only soubory má vip i supporter (placené tiery)
+  let canDownloadVip = $derived(
+    $authStore.subscription?.tier?.slug === 'vip' ||
+    $authStore.subscription?.tier?.slug === 'supporter'
+  )
+
+  // Verze seřazené od nejnovější (podle data vytvoření)
+  let sortedFiles = $derived(
+    [...files].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  )
+
+  // Aktuálně vybraný soubor
+  let selectedFile = $derived(sortedFiles.find(f => f.id === selectedFileId) ?? null)
+
+  // Je vybraná verze zamčená (VIP-only bez nároku)?
+  let selectedLocked = $derived(!!selectedFile?.vipOnly && !canDownloadVip)
+
+  // Načti seznam verzí z API
+  async function loadFiles() {
+    loadingFiles = true
+    try {
+      const detail = await FetchGameDetail(game.id)
+      const list = (detail.files as GameFile[]) || []
+      files = list
+
+      // Default = nejnovější verze DOSTUPNÁ pro daného uživatele
+      const sorted = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      const firstAvailable = sorted.find(f => !f.vipOnly || canDownloadVip)
+      selectedFileId = (firstAvailable ?? sorted[0])?.id ?? null
+    } catch (e) {
+      console.error('Nepodařilo se načíst verze:', e)
+    }
+    loadingFiles = false
+  }
+
+  // Formátování velikosti souboru
+  function formatSize(bytes: number | null): string {
+    if (!bytes) return ''
+    const units = ['B', 'kB', 'MB', 'GB']
+    let v = bytes
+    let i = 0
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+    return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
+  }
+
+  // Formátování data (dd.mm.yyyy)
+  function formatDate(iso: string): string {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
+  }
+
+  // Popisek verze do seznamu
+  function fileLabel(f: GameFile): string {
+    const parts = [f.version]
+    const size = formatSize(f.fileSize)
+    if (size) parts.push(size)
+    const date = formatDate(f.createdAt)
+    if (date) parts.push(date)
+    let label = parts.join(' • ')
+    if (f.vipOnly) label += canDownloadVip ? ' • VIP' : ' • VIP (nedostupné)'
+    return label
+  }
 
   // Zkontroluj instalaci pokaždé, když se změní cesta ke hře
   $effect(() => {
@@ -162,35 +243,34 @@
   async function startInstall() {
     if (!gamePath) { error = 'Vyberte složku s hrou'; return }
 
+    // Uživatel instaluje konkrétní vybranou verzi
+    const file = selectedFile
+    if (!file) {
+      error = 'Pro tuto lokalizaci zatím nejsou nahrány žádné soubory ke stažení'
+      return
+    }
+    if (file.vipOnly && !canDownloadVip) {
+      error = 'Tato verze je dostupná pouze pro VIP a Supporter členy'
+      return
+    }
+
     installing = true
     error = null
     success = false
     progress = 0
-    progressStage = 'Načítání informací o lokalizaci...'
+    progressStage = 'Zahajování instalace...'
     logs = []
 
     try {
-      // Získáme detail hry z Go backendu (obejití CORS)
-      const detail = await FetchGameDetail(game.id)
-
-      if (!detail.files || detail.files.length === 0) {
-        throw new Error('Pro tuto lokalizaci zatím nejsou nahrány žádné soubory ke stažení')
-      }
-
-      // Vybereme nejnovější soubor (poslední v poli)
-      const files = detail.files as Array<{ id: number; version: string; fileName: string }>
-      const latestFile = files[files.length - 1]
-      const downloadUrl = `${API_BASE}/api/download/${latestFile.id}`
-
-      logs = [...logs, `Stahování: ${latestFile.fileName} (verze ${latestFile.version})`]
-      progressStage = 'Zahajování instalace...'
+      const downloadUrl = `${API_BASE}/api/download/${file.id}`
+      logs = [...logs, `Stahování: ${file.fileName} (verze ${file.version})`]
 
       // Start listening before the operation so we don't miss early events.
       startProgressListening()
 
       await Install(
         game.slug,
-        latestFile.version || game.version || '1.0.0',
+        file.version || game.version || '1.0.0',
         downloadUrl,
         gamePath
       )
@@ -288,7 +368,7 @@
   function updateFocusables() {
     if (!modalElement) return
     const focusableElements = Array.from(
-      modalElement.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')
+      modalElement.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')
     ) as HTMLElement[]
 
     focusStore.updateZoneElements('modal', focusableElements)
@@ -310,6 +390,9 @@
         onClose?.()
       }
     })
+
+    // Načti dostupné verze překladu
+    loadFiles()
 
     // Automatické hledání her pouze pro VIP/Supporter uživatele
     if (canAutoScan) {
@@ -336,6 +419,8 @@
     void error
     void gamePath
     void isInstalled
+    void sortedFiles.length
+    void selectedLocked
     setTimeout(updateFocusables, 50)
   })
 </script>
@@ -415,6 +500,43 @@
 
     <!-- Stav 1: Podporuje přímou instalaci přes aplikaci -->
     {#if supportsAppInstall && isReady}
+      <!-- Výběr verze překladu -->
+      {#if sortedFiles.length > 0}
+        <div class="input-section">
+          <label for="version-select">Verze překladu</label>
+          <select
+            id="version-select"
+            class="version-select"
+            bind:value={selectedFileId}
+            disabled={installing || uninstalling || downloading}
+          >
+            {#each sortedFiles as f (f.id)}
+              <option value={f.id} disabled={f.vipOnly && !canDownloadVip}>
+                {fileLabel(f)}
+              </option>
+            {/each}
+          </select>
+
+          {#if selectedLocked}
+            <div class="vip-notice">
+              <Crown size={16} />
+              <span>Tato verze je dostupná pouze pro VIP a Supporter členy.</span>
+              <button class="vip-link" onclick={() => BrowserOpenURL(`${API_BASE}/support`)}>
+                Podpořit projekt
+              </button>
+            </div>
+          {:else if selectedFile}
+            <p class="version-meta">
+              {#if selectedFile.vipOnly}<Crown size={12} />{/if}
+              {selectedFile.fileName}
+              {#if selectedFile.downloads} • {selectedFile.downloads}× staženo{/if}
+            </p>
+          {/if}
+        </div>
+      {:else if loadingFiles}
+        <p class="version-loading">Načítání dostupných verzí...</p>
+      {/if}
+
       <div class="input-section">
         <label for="game-path-input">Cesta ke hře</label>
         <div class="input-row">
@@ -490,7 +612,7 @@
               Odebrat
             </button>
           {/if}
-          <button class="btn-primary" onclick={startInstall} disabled={!gamePath}>
+          <button class="btn-primary" onclick={startInstall} disabled={!gamePath || selectedLocked}>
             <Download size={18} />
             {isInstalled ? 'Přeinstalovat' : 'Nainstalovat'}
           </button>
@@ -537,7 +659,7 @@
               <div class="install-fill" style="width: {progress}%"></div>
             </div>
             <div class="install-logs">
-              {#each logs as log}
+              {#each logs as log, i (i)}
                 <div class="log-line">{log}</div>
               {/each}
             </div>
@@ -795,6 +917,90 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
+  }
+
+  /* Výběr verze překladu */
+  .version-select {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 14px;
+    color: white;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .version-select:focus {
+    border-color: #f97316;
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
+  }
+
+  .version-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .version-select option {
+    background: #1a1a1a;
+    color: white;
+  }
+
+  .version-select option:disabled {
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  .version-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    word-break: break-all;
+  }
+
+  .version-loading {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    margin: 0;
+  }
+
+  .vip-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    border-radius: 10px;
+    font-size: 13px;
+    color: #fbbf24;
+  }
+
+  .vip-link {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fbbf24;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .vip-link:hover,
+  .vip-link:focus {
+    background: rgba(251, 191, 36, 0.25);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.4);
   }
 
   .input-row {
