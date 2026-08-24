@@ -7,6 +7,7 @@
   import { favoritesStore } from '../stores/favorites.svelte'
   import { BrowseFolder, ScanGames, FetchGameDetail, DownloadLocalization, Install, Uninstall, CancelInstall, IsInstalled } from '../../../wailsjs/go/main/App'
   import { EventsOn, EventsOff, BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
+  import Dropdown, { type DropdownOption } from './Dropdown.svelte'
 
   const API_BASE = 'https://lokalizace.net'
 
@@ -96,17 +97,23 @@
     return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
   }
 
-  // Popisek verze do seznamu
-  function fileLabel(f: GameFile): string {
-    const parts = [f.version]
-    const size = formatSize(f.fileSize)
-    if (size) parts.push(size)
-    const date = formatDate(f.createdAt)
-    if (date) parts.push(date)
-    let label = parts.join(' • ')
-    if (f.vipOnly) label += canDownloadVip ? ' • VIP' : ' • VIP (nedostupné)'
-    return label
-  }
+  // Verze převedené na položky dropdownu (velikost + datum jako detail)
+  let versionOptions = $derived<DropdownOption[]>(
+    sortedFiles.map(f => {
+      const parts: string[] = []
+      const size = formatSize(f.fileSize)
+      if (size) parts.push(size)
+      const date = formatDate(f.createdAt)
+      if (date) parts.push(date)
+      return {
+        value: f.id,
+        label: f.version,
+        detail: parts.join(' • '),
+        disabled: f.vipOnly && !canDownloadVip,
+        badge: f.vipOnly ? 'vip' as const : undefined
+      }
+    })
+  )
 
   // Zkontroluj instalaci pokaždé, když se změní cesta ke hře
   $effect(() => {
@@ -367,9 +374,11 @@
 
   function updateFocusables() {
     if (!modalElement) return
+    // Pozn.: prvky uvnitř otevřeného dropdownu se do 'modal' zóny nesbírají -
+    // dropdown si registruje vlastní zónu a po zavření vrátí fokus sem.
     const focusableElements = Array.from(
-      modalElement.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')
-    ) as HTMLElement[]
+      modalElement.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')
+    ).filter(el => !el.closest('.dropdown-list')) as HTMLElement[]
 
     focusStore.updateZoneElements('modal', focusableElements)
 
@@ -503,19 +512,14 @@
       <!-- Výběr verze překladu -->
       {#if sortedFiles.length > 0}
         <div class="input-section">
-          <label for="version-select">Verze překladu</label>
-          <select
-            id="version-select"
-            class="version-select"
+          <span class="section-label">Verze překladu</span>
+          <Dropdown
             bind:value={selectedFileId}
+            options={versionOptions}
             disabled={installing || uninstalling || downloading}
-          >
-            {#each sortedFiles as f (f.id)}
-              <option value={f.id} disabled={f.vipOnly && !canDownloadVip}>
-                {fileLabel(f)}
-              </option>
-            {/each}
-          </select>
+            placeholder="Vyberte verzi..."
+            returnZone="modal"
+          />
 
           {#if selectedLocked}
             <div class="vip-notice">
@@ -920,37 +924,14 @@
   }
 
   /* Výběr verze překladu */
-  .version-select {
-    width: 100%;
-    height: 44px;
-    padding: 0 14px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    font-size: 14px;
-    color: white;
-    outline: none;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .version-select:focus {
-    border-color: #f97316;
-    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
-  }
-
-  .version-select:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .version-select option {
-    background: #1a1a1a;
-    color: white;
-  }
-
-  .version-select option:disabled {
-    color: rgba(255, 255, 255, 0.35);
+  .section-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
   }
 
   .version-meta {
