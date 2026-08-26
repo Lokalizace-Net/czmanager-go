@@ -27,6 +27,7 @@
   let detectedPath = $state<string | null>(null)
   let scanning = $state(false)
   let isInstalled = $state(false)  // je lokalizace nainstalovaná v gamePath?
+  let authRetried = $state(false)  // už jsme po 401 zkusili obnovit token?
 
   // Verze překladu (soubory z API)
   interface GameFile {
@@ -237,7 +238,27 @@
         stopProgressListening()
         installing = false
         uninstalling = false
-        error = data.error || 'Operace selhala'
+        const msg = data.error || 'Operace selhala'
+
+        // Server odmítl kvůli autorizaci (vypršelý/zneplatněný token).
+        // Obnov token a zkus instalaci ještě jednou - uživateli to jinak
+        // hází 401, i když má platné VIP členství.
+        const authFailed = /\b401\b|\b403\b|nemáte přístup/i.test(msg)
+        if (authFailed && !authRetried && $authStore.user) {
+          authRetried = true
+          error = null
+          logs = [...logs, 'Autorizace vypršela, obnovuji přihlášení a zkouším znovu...']
+          authStore.forceRefresh().then(t => {
+            if (t) {
+              startInstall()
+            } else {
+              error = 'Přihlášení vypršelo. Odhlaste se a přihlaste znovu.'
+            }
+          })
+          return
+        }
+
+        error = msg
       }
     })
   }
@@ -245,6 +266,12 @@
   function stopProgressListening() {
     EventsOff('install:progress')
     EventsOff('install:log')
+  }
+
+  // Instalace spuštěná uživatelem (kliknutí) - povolí jeden auth retry
+  function startInstallByUser() {
+    authRetried = false
+    startInstall()
   }
 
   async function startInstall() {
@@ -275,13 +302,17 @@
       // Start listening before the operation so we don't miss early events.
       startProgressListening()
 
+      // Token je potřebný pro VIP/Supporter only soubory. ensureValidToken()
+      // ho případně obnoví - access token má krátkou životnost a bez obnovení
+      // by server u dlouho běžící aplikace vracel 401.
+      const token = (await authStore.ensureValidToken()) ?? ''
+
       await Install(
         game.slug,
         file.version || game.version || '1.0.0',
         downloadUrl,
         gamePath,
-        // Token je potřebný pro VIP/Supporter only soubory (jinak server vrátí 401)
-        $authStore.accessToken || ''
+        token
       )
 
     } catch (err) {
@@ -363,11 +394,13 @@
     })
 
     try {
-      // Stáhne vybranou verzi (0 = fallback na nejnovější) s tokenem pro VIP soubory
+      // Stáhne vybranou verzi (0 = fallback na nejnovější) s platným tokenem
+      // pro VIP soubory (ensureValidToken případně obnoví vypršelý token)
+      const token = (await authStore.ensureValidToken()) ?? ''
       const savedPath = await DownloadLocalization(
         game.id,
         selectedFileId ?? 0,
-        $authStore.accessToken || ''
+        token
       )
       console.log('Downloaded to:', savedPath)
     } catch (err) {
@@ -623,7 +656,7 @@
               Odebrat
             </button>
           {/if}
-          <button class="btn-primary" onclick={startInstall} disabled={!gamePath || selectedLocked}>
+          <button class="btn-primary" onclick={startInstallByUser} disabled={!gamePath || selectedLocked}>
             <Download size={18} />
             {isInstalled ? 'Přeinstalovat' : 'Nainstalovat'}
           </button>
