@@ -38,6 +38,7 @@ type InstallRequest struct {
 	DownloadURL string `json:"download_url,omitempty"` // Volitelné - agent si zjistí sám
 	GameRoot    string `json:"game_root"`
 	LocalZip    string `json:"local_zip,omitempty"`    // Volitelné - lokální ZIP pro manuální instalaci (přeskočí stahování)
+	AccessToken string `json:"access_token,omitempty"` // Volitelné - potřebný pro VIP/Supporter only soubory
 }
 
 // UninstallRequest is sent to uninstall a localization

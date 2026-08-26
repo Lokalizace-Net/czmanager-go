@@ -22,8 +22,8 @@ export function CheckUpdate() {
   return window['go']['main']['App']['CheckUpdate']();
 }
 
-export function DownloadLocalization(arg1) {
-  return window['go']['main']['App']['DownloadLocalization'](arg1);
+export function DownloadLocalization(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DownloadLocalization'](arg1, arg2, arg3);
 }
 
 export function FetchFavorites(arg1) {
@@ -58,8 +58,8 @@ export function GetVersion() {
   return window['go']['main']['App']['GetVersion']();
 }
 
-export function Install(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['Install'](arg1, arg2, arg3, arg4);
+export function Install(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['Install'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function InstallLocal(arg1, arg2) {

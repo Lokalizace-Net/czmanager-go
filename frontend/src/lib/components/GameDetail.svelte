@@ -279,7 +279,9 @@
         game.slug,
         file.version || game.version || '1.0.0',
         downloadUrl,
-        gamePath
+        gamePath,
+        // Token je potřebný pro VIP/Supporter only soubory (jinak server vrátí 401)
+        $authStore.accessToken || ''
       )
 
     } catch (err) {
@@ -361,7 +363,12 @@
     })
 
     try {
-      const savedPath = await DownloadLocalization(game.id)
+      // Stáhne vybranou verzi (0 = fallback na nejnovější) s tokenem pro VIP soubory
+      const savedPath = await DownloadLocalization(
+        game.id,
+        selectedFileId ?? 0,
+        $authStore.accessToken || ''
+      )
       console.log('Downloaded to:', savedPath)
     } catch (err) {
       error = err instanceof Error ? err.message : 'Stahování selhalo'
