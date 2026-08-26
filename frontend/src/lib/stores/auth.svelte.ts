@@ -194,16 +194,23 @@ function createAuthStore() {
   async function ensureValidToken(): Promise<string | null> {
     const state = get({ subscribe })
 
-    if (!state.accessToken || !state.expiresAt) {
+    if (!state.accessToken) {
       return null
     }
 
-    // Zkontroluj jestli token brzy nevyprší (5 minut předem)
-    const expiresAt = new Date(state.expiresAt)
-    const now = new Date()
-    const fiveMinutes = 5 * 60 * 1000
+    // Chybí nebo je nečitelné expiresAt (např. starší uložený stav) - zkus
+    // token radši obnovit, než vrátit něco, co server odmítne s 401.
+    const expiresMs = state.expiresAt ? new Date(state.expiresAt).getTime() : NaN
+    if (isNaN(expiresMs)) {
+      if (state.refreshToken && await refreshAccessToken()) {
+        return get({ subscribe }).accessToken
+      }
+      return state.accessToken
+    }
 
-    if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
+    // Zkontroluj jestli token brzy nevyprší (5 minut předem)
+    const fiveMinutes = 5 * 60 * 1000
+    if (expiresMs - Date.now() < fiveMinutes) {
       const refreshed = await refreshAccessToken()
       if (!refreshed) {
         return null
@@ -212,6 +219,17 @@ function createAuthStore() {
     }
 
     return state.accessToken
+  }
+
+  // Vynuceně obnoví token (použití: server odmítl request s 401, i když jsme
+  // token považovali za platný - např. byl zneplatněn na serveru).
+  async function forceRefresh(): Promise<string | null> {
+    const state = get({ subscribe })
+    if (!state.refreshToken) return null
+    if (await refreshAccessToken()) {
+      return get({ subscribe }).accessToken
+    }
+    return null
   }
 
   // Načti subscription info - volá Go backend přes Wails
@@ -259,6 +277,7 @@ function createAuthStore() {
     logout,
     refreshAccessToken,
     ensureValidToken,
+    forceRefresh,
     fetchSubscription,
     init,
     clearError: () => update(s => ({ ...s, error: null }))
