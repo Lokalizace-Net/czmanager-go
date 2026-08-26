@@ -232,7 +232,7 @@ func (s *Service) doInstall(req models.InstallRequest) {
 	s.setProgress(models.StageDownloading, 5, "Stahování lokalizace...")
 	s.logInfo(fmt.Sprintf("Stahování z: %s", downloadURL))
 
-	if err := s.downloadFile(downloadURL, zipPath); err != nil {
+	if err := s.downloadFile(downloadURL, zipPath, req.AccessToken); err != nil {
 		s.setError(fmt.Sprintf("Stahování selhalo: %v", err))
 		s.logError(err.Error())
 		return
@@ -540,13 +540,26 @@ func (s *Service) fetchDownloadURL(gameID int) (string, error) {
 	return downloadURL, nil
 }
 
-func (s *Service) downloadFile(url, destPath string) error {
-	resp, err := http.Get(url)
+// downloadFile stáhne soubor. accessToken je potřebný pro VIP/Supporter only
+// soubory - bez něj server vrátí 401.
+func (s *Service) downloadFile(url, destPath, accessToken string) error {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	if accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return fmt.Errorf("k této verzi nemáte přístup (status %d) - je vyžadováno VIP/Supporter členství a přihlášení", resp.StatusCode)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("server vrátil status %d", resp.StatusCode)
 	}

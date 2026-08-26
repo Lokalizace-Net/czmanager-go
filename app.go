@@ -279,7 +279,8 @@ func (a *App) IsInstalled(gameRoot string) bool {
 
 // Install starts a localization install and streams progress/logs to the
 // frontend via the "install:progress" and "install:log" events.
-func (a *App) Install(gameSlug, version, downloadURL, gameRoot string) error {
+// accessToken je potřebný pro VIP/Supporter only soubory (bez něj vrátí server 401).
+func (a *App) Install(gameSlug, version, downloadURL, gameRoot, accessToken string) error {
 	if a.installer == nil {
 		return fmt.Errorf("installer not ready")
 	}
@@ -288,6 +289,7 @@ func (a *App) Install(gameSlug, version, downloadURL, gameRoot string) error {
 		Version:     version,
 		DownloadURL: downloadURL,
 		GameRoot:    gameRoot,
+		AccessToken: accessToken,
 	}
 	if err := a.installer.Install(req); err != nil {
 		return err
@@ -656,7 +658,10 @@ func (a *App) FetchGameDetail(gameId int) (map[string]interface{}, error) {
 }
 
 // DownloadLocalization downloads localization file - lets user choose where to save
-func (a *App) DownloadLocalization(gameId int) (string, error) {
+// DownloadLocalization stáhne konkrétní soubor lokalizace do složky vybrané
+// uživatelem. wantFileId určuje verzi (0 = nejnovější), accessToken je potřebný
+// pro VIP/Supporter only soubory.
+func (a *App) DownloadLocalization(gameId int, wantFileId int, accessToken string) (string, error) {
 	// Nejprve získáme detail hry
 	detail, err := a.FetchGameDetail(gameId)
 	if err != nil {
@@ -668,10 +673,23 @@ func (a *App) DownloadLocalization(gameId int) (string, error) {
 		return "", fmt.Errorf("žádné soubory ke stažení")
 	}
 
-	// Vezmeme poslední (nejnovější) soubor
-	lastFile := files[len(files)-1].(map[string]interface{})
-	fileId := int(lastFile["id"].(float64))
-	fileName := lastFile["fileName"].(string)
+	// Vyber požadovaný soubor (podle id), jinak fallback na poslední
+	chosen, _ := files[len(files)-1].(map[string]interface{})
+	if wantFileId > 0 {
+		for _, f := range files {
+			if m, ok := f.(map[string]interface{}); ok {
+				if id, ok := m["id"].(float64); ok && int(id) == wantFileId {
+					chosen = m
+					break
+				}
+			}
+		}
+	}
+	if chosen == nil {
+		return "", fmt.Errorf("soubor ke stažení nebyl nalezen")
+	}
+	fileId := int(chosen["id"].(float64))
+	fileName, _ := chosen["fileName"].(string)
 
 	// Výchozí složka Downloads
 	var defaultDir string
@@ -708,13 +726,21 @@ func (a *App) DownloadLocalization(gameId int) (string, error) {
 		"file":    fileName,
 	})
 
-	// Stáhneme soubor
+	// Stáhneme soubor (s tokenem - VIP/Supporter only soubory ho vyžadují)
 	client := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := client.Get(downloadURL)
+	dlReq, _ := http.NewRequest("GET", downloadURL, nil)
+	if accessToken != "" {
+		dlReq.Header.Set("Authorization", "Bearer "+accessToken)
+	}
+	resp, err := client.Do(dlReq)
 	if err != nil {
 		return "", fmt.Errorf("nepodařilo se stáhnout: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return "", fmt.Errorf("k této verzi nemáte přístup - je vyžadováno VIP/Supporter členství a přihlášení")
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("server vrátil status %d", resp.StatusCode)
